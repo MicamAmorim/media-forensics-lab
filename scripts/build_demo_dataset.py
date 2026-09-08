@@ -22,6 +22,8 @@ def _write_png_unicode(path: Path, arr: np.ndarray):
 def _make_face_replacement(base_rgb: np.ndarray, donor_path: Path):
     base_bgr=cv2.cvtColor(base_rgb,cv2.COLOR_RGB2BGR)
     donor=cv2.imdecode(np.fromfile(donor_path,dtype=np.uint8),cv2.IMREAD_COLOR)
+    if donor is None:
+        raise RuntimeError(f'could not decode face donor fixture: {donor_path}')
     cascade=cv2.CascadeClassifier(cv2.data.haarcascades+'haarcascade_frontalface_default.xml')
     fb=cascade.detectMultiScale(cv2.cvtColor(base_bgr,cv2.COLOR_BGR2GRAY),1.1,5,minSize=(50,50))
     fd=cascade.detectMultiScale(cv2.cvtColor(donor,cv2.COLOR_BGR2GRAY),1.1,5,minSize=(30,30))
@@ -49,10 +51,13 @@ def main():
     bgr=cv2.cvtColor(a,cv2.COLOR_RGB2BGR); mk=np.zeros((h,w),np.uint8); cv2.circle(mk,(260,250),35,255,-1); inp=cv2.inpaint(bgr,mk,5,cv2.INPAINT_TELEA)
     save_rgb(OUT/'images'/'img_006_inpainted.jpg',cv2.cvtColor(inp,cv2.COLOR_BGR2RGB),93); _write_png_unicode(OUT/'masks'/'img_006_inpainted_mask.png',mk)
 
-    face_rgb, face_mask, face_bbox = _make_face_replacement(a, FIX/'face_donor_ai.png')
+    # Compact, valid JPEG source fixtures avoid fragile binary transfers while
+    # preserving the controlled synthetic content. The fully synthetic source
+    # is deterministically resized to the 512x512 demo image.
+    face_rgb, face_mask, face_bbox = _make_face_replacement(a, FIX/'face_donor_ai.jpg')
     save_rgb(OUT/'images'/'img_007_deepfake_face.jpg',face_rgb,94)
     _write_png_unicode(OUT/'masks'/'img_007_deepfake_face_mask.png',face_mask)
-    with Image.open(FIX/'ai_generated_fixture.png') as ai_src:
+    with Image.open(FIX/'ai_generated_fixture.jpg') as ai_src:
         ai_src.convert('RGB').resize((512,512),Image.Resampling.LANCZOS).save(OUT/'images'/'img_008_ai_generated.png')
 
     frames=[]
@@ -81,7 +86,7 @@ def main():
        'img_005_resampled.jpg':{'label':'processed','method':'resampling'},
        'img_006_inpainted.jpg':{'label':'manipulated','method':'classical_inpainting','mask':'../masks/img_006_inpainted_mask.png','reference':'img_001_pristine.jpg','expected_bbox_xywh':[225,215,71,71]},
        'img_007_deepfake_face.jpg':{'label':'manipulated','method':'synthetic_face_replacement','mask':'../masks/img_007_deepfake_face_mask.png','reference':'img_001_pristine.jpg','face_bbox_xywh':face_bbox,'source':'AI-generated donor face blended only into face region','claim_scope':'controlled face-replacement fixture; not a benchmark DeepFaceLab/FaceSwap sample'},
-       'img_008_ai_generated.png':{'label':'synthetic','method':'fully_ai_generated','source':'OpenAI-generated natural-scene fixture','source_fixture':'dataset/fixtures/ai_generated_fixture.png','claim_scope':'fully AI-generated pixels; controlled regression fixture only; not a population-valid benchmark sample'}},
+       'img_008_ai_generated.png':{'label':'synthetic','method':'fully_ai_generated','source':'OpenAI-generated natural-scene fixture','source_fixture':'dataset/fixtures/ai_generated_fixture.jpg','claim_scope':'fully AI-generated pixels; controlled regression fixture only; not a population-valid benchmark sample'}},
       'videos':{
        'vid_001_pristine.mp4':{'label':'pristine'},
        'vid_002_duplicated_frames.mp4':{'label':'manipulated','method':'frame_duplication','expected_duplicate_transitions':[36,37,38,39,40]},
