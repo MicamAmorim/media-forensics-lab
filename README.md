@@ -14,9 +14,12 @@ Laboratório educacional/de pesquisa para **análise reproduzível de autenticid
 - interface responsiva sem CDN ou biblioteca gráfica externa;
 - casos da interface são armazenados temporariamente na máquina local e execuções antigas são removidas na inicialização;
 - os gráficos mostram **contagens de indicadores de triagem**, nunca probabilidades, percentuais de falsificação ou peso de evidência;
-- toda a base analítica da v0.4 permanece presente, inclusive as fixtures de face replacement/IA, comparação assistida por referência e análise de descontinuidade de vídeo.
+- toda a base analítica da v0.4 permanece presente, inclusive as fixtures de face replacement/IA, comparação assistida por referência e análise de descontinuidade de vídeo;
+- CI/CD endurecido: matriz Windows/Ubuntu × Python 3.10/3.11/3.12, `ci-gate` estável, smoke test de empacotamento e release por tag;
+- `ground_truth.json` tornou-se um **oráculo canônico independente**: o CI só passa com 100% de cobertura e 100% de aprovação das fixtures e dos checks obrigatórios declarados no GT;
+- gate de versionamento SemVer e Dependabot para dependências Python/GitHub Actions.
 
-Documentação específica: `docs/INTERACTIVE_REPORT.md`.
+Documentação específica: `docs/INTERACTIVE_REPORT.md` e `docs/CI_CD.md`.
 
 ## Recursos analíticos
 
@@ -47,14 +50,18 @@ Integrações opcionais com CodeRafay/Veritas e DeepfakeBench permanecem desacop
 
 ```text
 media-forensics-lab/
+├── .github/
+│   ├── workflows/ci.yml      # CI + gate de GT + packaging
+│   └── workflows/release.yml # CD por tag SemVer
 ├── mf_lab/
-│   ├── analysis/            # métodos nativos
-│   ├── integrations/        # Veritas / DeepfakeBench / resultados externos
-│   ├── report/              # gerador DOCX/Markdown
-│   ├── web/                 # HTML/CSS/JS do laudo interativo
-│   ├── webapp.py            # servidor local Flask
+│   ├── analysis/             # métodos nativos
+│   ├── integrations/         # Veritas / DeepfakeBench / resultados externos
+│   ├── report/               # gerador DOCX/Markdown
+│   ├── web/                  # HTML/CSS/JS do laudo interativo
+│   ├── webapp.py             # servidor local Flask
 │   └── pipeline.py
 ├── docs/
+│   ├── CI_CD.md
 │   ├── DEEPFAKE_PROTOCOL.md
 │   ├── INTERACTIVE_REPORT.md
 │   ├── UPSTREAM_EVALUATION.md
@@ -123,7 +130,7 @@ As barras representam apenas **quantidade de indicadores de triagem emitidos por
 ```bash
 python scripts/build_demo_dataset.py
 pytest -q
-mflab validate-demo --out validation/demo_validation.json
+python scripts/ci_validate_gt.py --out validation/demo_validation.json
 ```
 
 A base controlada inclui:
@@ -141,7 +148,9 @@ A base controlada inclui:
 - remoção de segmento;
 - overlay.
 
-Na v0.4, o harness contém 16 verificações controladas. Alguns checks de splice, inpainting, face replacement e remoção de segmento são **reference-assisted**. A base serve para regressão de engenharia e **não** estima sensibilidade, especificidade, FPR/FNR ou validade pericial em população real.
+Na v0.5, `dataset/demo/ground_truth.json` é o oráculo canônico e não é reescrito pelo gerador de fixtures. As 12 fixtures declaram 16 checks obrigatórios. O gate exige simultaneamente **100% de cobertura de fixtures, 100% de aprovação de fixtures, 100% de cobertura de assertions e 100% de aprovação de assertions**, além de zero erros de contrato e zero checks obrigatórios não suportados. Alguns checks de splice, inpainting, face replacement e remoção de segmento são **reference-assisted**.
+
+Esse “100%” é estritamente uma propriedade da regressão contra a base controlada. A base **não** estima sensibilidade, especificidade, FPR/FNR ou validade pericial em população real.
 
 ## Perfis
 
@@ -194,6 +203,19 @@ Resultados upstream permanecem separados e nunca são fundidos silenciosamente e
 
 `prnu_screen` produz somente residual de triagem. **Não chame isso de identificação de câmera.** Source-camera identification exige vários exemplares conhecidos, fingerprint adequadamente extraído/normalizado e estatística calibrada, como PCE, com validação documentada.
 
+## CI/CD e versionamento
+
+O CI executa a matriz Windows/Ubuntu × Python 3.10/3.11/3.12 e só libera o status final `ci-gate` quando testes, GT e empacotamento passam. Para reproduzir localmente:
+
+```bash
+python scripts/check_version.py
+python scripts/build_demo_dataset.py
+pytest -q
+python scripts/ci_validate_gt.py --out validation/demo_validation.json
+```
+
+Releases usam SemVer. Uma tag como `v0.5.0` só gera GitHub Release quando a tag coincide com `pyproject.toml` e **toda a matriz de validação da release passa novamente**. Consulte `docs/CI_CD.md` para a política completa e para as regras recomendadas de proteção da branch `main`.
+
 ## Desenvolvimento
 
 ```bash
@@ -201,4 +223,4 @@ pytest -q
 mflab integrations
 ```
 
-O CI testa Python 3.10, 3.11 e 3.12 em Windows e Ubuntu.
+Nenhuma alteração científica do GT deve ser feita apenas para “fazer o teste passar”. Mudanças no oráculo devem justificar a expectativa nova e os checks correspondentes no PR.
