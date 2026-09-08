@@ -12,12 +12,20 @@ from mf_lab.analysis.deepfake import image_deepfake_protocol
 from mf_lab.analysis.image import copy_move_orb
 from mf_lab.analysis.video import frame_hash_duplicates, frame_transition_anomalies, motion_discontinuity_screen
 from mf_lab.analysis.reference import reference_image_difference, reference_video_sequence_alignment
-from mf_lab.analysis.c2pa import c2pa_inspect
 from mf_lab.validation import validate_demo
 
 ROOT = Path(__file__).resolve().parents[1]
 D = ROOT / "dataset" / "demo"
 GT = json.loads((D / "ground_truth.json").read_text(encoding="utf-8"))
+
+
+def test_every_ground_truth_fixture_declares_required_checks():
+    for kind in ("images", "videos"):
+        assert GT[kind], f"GT section {kind} must not be empty"
+        for name, meta in GT[kind].items():
+            checks = meta.get("required_checks")
+            assert isinstance(checks, list) and checks, f"{name} has no required_checks"
+            assert len(checks) == len(set(checks)), f"{name} has duplicate required_checks"
 
 
 def test_copy_move_detects_injected_translation():
@@ -64,13 +72,24 @@ def test_pristine_image_not_escalated_as_deepfake():
     assert r["validated_external_models"] == 0
 
 
-def test_demo_validation_harness_passes_required_regressions(tmp_path):
+def test_demo_validation_harness_is_exactly_100_percent_against_gt(tmp_path):
     out = tmp_path / "validation.json"
     r = validate_demo(D, out)
-    assert r["summary"]["failed"] == 0
-    assert r["summary"]["ready_for_demo_regression"] is True
-    assert r["summary"]["unsupported"] == 0
-    assert r["summary"]["required_checks"] >= 16
+    s = r["summary"]
+    assert s["gt_contract_errors"] == 0
+    assert s["unsupported"] == 0
+    assert s["failed"] == 0
+    assert s["gt_fixture_coverage_pct"] == 100.0
+    assert s["gt_fixture_pass_rate_pct"] == 100.0
+    assert s["gt_assertion_coverage_pct"] == 100.0
+    assert s["gt_pass_rate_pct"] == 100.0
+    assert s["gt_fixture_count"] == len(GT["images"]) + len(GT["videos"])
+    assert s["gt_required_assertions"] == sum(
+        len(meta["required_checks"])
+        for kind in ("images", "videos")
+        for meta in GT[kind].values()
+    )
+    assert s["ready_for_demo_regression"] is True
     assert out.exists()
 
 
@@ -101,7 +120,6 @@ def test_face_replacement_reference_localization():
 
 
 def test_ai_generated_native_synthetic_texture_screen():
-    from mf_lab.analysis.deepfake import image_deepfake_protocol
     r=image_deepfake_protocol(D/"images"/"img_008_ai_generated.png")
     assert any(x.get("family") == "synthetic_texture" for x in r.get("screening_observations", []))
 
@@ -115,4 +133,4 @@ def test_segment_deletion_motion_discontinuity():
 def test_segment_deletion_reference_alignment():
     gt=GT["videos"]["vid_003_deleted_segment.mp4"]
     r=reference_video_sequence_alignment(D/"videos"/"vid_003_deleted_segment.mp4", D/"videos"/gt["reference"])
-    assert any(x["skipped_reference_count"] == 10 and [x["previous_reference_index"],x["next_reference_index"]] == gt["expected_reference_jump"] for x in r["skipped_segments"])
+    assert any(x["skipped_reference_count"] == len(gt["deleted_source_frames"]) and [x["previous_reference_index"],x["next_reference_index"]] == gt["expected_reference_jump"] for x in r["skipped_segments"])
