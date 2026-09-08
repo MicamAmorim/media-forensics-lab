@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: release-validate-${{ matrix.os }}-py${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+
+      - name: Require tag to match project SemVer
+        run: python scripts/check_version.py --tag "${{ github.ref_name }}"
+
+      - name: Compile source tree
+        run: python -m compileall -q mf_lab scripts tests
+
+      - name: Build controlled demo fixtures
+        run: python scripts/build_demo_dataset.py
+
+      - name: Ensure canonical GT was not rewritten
+        run: git diff --exit-code -- dataset/demo/ground_truth.json
+
+      - name: Run automated tests
+        run: pytest -q
+
+      - name: Require 100 percent GT validation
+        run: python scripts/ci_validate_gt.py --out validation/demo_validation.json
+
+      - name: Dependency consistency
+        run: python -m pip check
+
+  publish:
+    name: publish-github-release
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate version and build distributions
+        run: |
+          python -m pip install --upgrade pip build
+          python scripts/check_version.py --tag "${{ github.ref_name }}"
+          python -m build
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+
+      - name: Upload release build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --verify-tag \
+            --generate-notes \
+            --title "Media Forensics Lab ${{ github.ref_name }}"

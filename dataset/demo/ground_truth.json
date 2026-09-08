@@ -1,19 +1,118 @@
 {
   "images": {
-    "img_001_pristine.jpg": {"label": "pristine"},
-    "img_002_copy_move.jpg": {"label": "manipulated", "method": "copy_move", "mask": "../masks/img_002_copy_move_mask.png", "source_bbox": [70,90,170,190], "destination_bbox": [300,330,400,430], "expected_translation_px": [230,240]},
-    "img_003_splice.jpg": {"label": "manipulated", "method": "splice", "mask": "../masks/img_003_splice_mask.png", "reference": "img_001_pristine.jpg", "expected_bbox_xywh": [40,260,160,130]},
-    "img_004_double_jpeg.jpg": {"label": "processed", "method": "double_jpeg"},
-    "img_005_resampled.jpg": {"label": "processed", "method": "resampling"},
-    "img_006_inpainted.jpg": {"label": "manipulated", "method": "classical_inpainting", "mask": "../masks/img_006_inpainted_mask.png", "reference": "img_001_pristine.jpg", "expected_bbox_xywh": [225,215,71,71]},
-    "img_007_deepfake_face.jpg": {"label": "manipulated", "method": "synthetic_face_replacement", "mask": "../masks/img_007_deepfake_face_mask.png", "reference": "img_001_pristine.jpg", "face_bbox_xywh": [177,66,95,95], "source": "AI-generated donor face blended only into face region", "claim_scope": "controlled face-replacement fixture; not a benchmark DeepFaceLab/FaceSwap sample"},
-    "img_008_ai_generated.png": {"label": "synthetic", "method": "fully_ai_generated", "source": "OpenAI-generated natural-scene fixture", "source_fixture": "dataset/fixtures/ai_generated_fixture.png", "claim_scope": "fully AI-generated pixels; controlled regression fixture only; not a population-valid benchmark sample"}
+    "img_001_pristine.jpg": {
+      "label": "pristine",
+      "required_checks": [
+        "pristine_image_not_deepfake_escalated",
+        "pristine_image_no_copy_move_cluster"
+      ]
+    },
+    "img_002_copy_move.jpg": {
+      "label": "manipulated",
+      "method": "copy_move",
+      "mask": "../masks/img_002_copy_move_mask.png",
+      "source_bbox": [70, 90, 170, 190],
+      "destination_bbox": [300, 330, 400, 430],
+      "expected_translation_px": [230, 240],
+      "required_checks": [
+        "copy_move_detected",
+        "copy_move_translation_matches_fixture"
+      ]
+    },
+    "img_003_splice.jpg": {
+      "label": "manipulated",
+      "method": "splice",
+      "mask": "../masks/img_003_splice_mask.png",
+      "reference": "img_001_pristine.jpg",
+      "expected_bbox_xywh": [40, 260, 160, 130],
+      "required_checks": [
+        "splice_reference_localization"
+      ]
+    },
+    "img_004_double_jpeg.jpg": {
+      "label": "processed",
+      "method": "double_jpeg",
+      "required_checks": [
+        "double_jpeg_dct_ranks_above_pristine"
+      ]
+    },
+    "img_005_resampled.jpg": {
+      "label": "processed",
+      "method": "resampling",
+      "required_checks": [
+        "resampling_fixture_separates_from_pristine"
+      ]
+    },
+    "img_006_inpainted.jpg": {
+      "label": "manipulated",
+      "method": "classical_inpainting",
+      "mask": "../masks/img_006_inpainted_mask.png",
+      "reference": "img_001_pristine.jpg",
+      "expected_bbox_xywh": [225, 215, 71, 71],
+      "required_checks": [
+        "inpainting_reference_localization"
+      ]
+    },
+    "img_007_deepfake_face.jpg": {
+      "label": "manipulated",
+      "method": "synthetic_face_replacement",
+      "mask": "../masks/img_007_deepfake_face_mask.png",
+      "reference": "img_001_pristine.jpg",
+      "face_bbox_xywh": [177, 66, 95, 95],
+      "source": "AI-generated donor face blended only into face region",
+      "claim_scope": "controlled face-replacement fixture; not a benchmark DeepFaceLab/FaceSwap sample",
+      "required_checks": [
+        "face_replacement_native_screening_flag",
+        "face_replacement_reference_localization"
+      ]
+    },
+    "img_008_ai_generated.png": {
+      "label": "synthetic",
+      "method": "fully_ai_generated",
+      "source": "OpenAI-generated natural-scene fixture",
+      "source_fixture": "dataset/fixtures/ai_generated_fixture.jpg",
+      "claim_scope": "fully AI-generated pixels; controlled regression fixture only; not a population-valid benchmark sample",
+      "required_checks": [
+        "ai_generated_native_synthetic_texture_screen"
+      ]
+    }
   },
   "videos": {
-    "vid_001_pristine.mp4": {"label": "pristine"},
-    "vid_002_duplicated_frames.mp4": {"label": "manipulated", "method": "frame_duplication", "expected_duplicate_transitions": [36,37,38,39,40]},
-    "vid_003_deleted_segment.mp4": {"label": "manipulated", "method": "segment_deletion_then_reencode", "deleted_source_frames": [30,31,32,33,34,35,36,37,38,39], "reference": "vid_001_pristine.mp4", "expected_questioned_transition_index": 30, "expected_reference_jump": [29,40]},
-    "vid_004_overlay_edit.mp4": {"label": "manipulated", "method": "overlay_then_reencode", "overlay_frame_range": [25,49], "expected_abrupt_transitions": [25,50]}
+    "vid_001_pristine.mp4": {
+      "label": "pristine",
+      "required_checks": [
+        "pristine_video_no_duplicate_or_abrupt_transition_flag"
+      ]
+    },
+    "vid_002_duplicated_frames.mp4": {
+      "label": "manipulated",
+      "method": "frame_duplication",
+      "expected_duplicate_transitions": [36, 37, 38, 39, 40],
+      "required_checks": [
+        "duplicated_frames_exact_fixture_positions"
+      ]
+    },
+    "vid_003_deleted_segment.mp4": {
+      "label": "manipulated",
+      "method": "segment_deletion_then_reencode",
+      "deleted_source_frames": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+      "reference": "vid_001_pristine.mp4",
+      "expected_questioned_transition_index": 30,
+      "expected_reference_jump": [29, 40],
+      "required_checks": [
+        "segment_deletion_motion_discontinuity",
+        "segment_deletion_reference_alignment"
+      ]
+    },
+    "vid_004_overlay_edit.mp4": {
+      "label": "manipulated",
+      "method": "overlay_then_reencode",
+      "overlay_frame_range": [25, 49],
+      "expected_abrupt_transitions": [25, 50],
+      "required_checks": [
+        "overlay_edit_abrupt_boundaries_detected"
+      ]
+    }
   },
-  "note": "Controlled educational ground truth. It validates pipeline mechanics and regression behavior only, not real-world error rates or forensic validity. Reference-assisted checks require a trustworthy corresponding source file."
+  "note": "Canonical controlled educational ground truth. CI requires 100% fixture coverage and 100% pass rate for every required check declared here. This validates pipeline mechanics and regression behavior only, not real-world error rates or forensic validity. Reference-assisted checks require a trustworthy corresponding source file."
 }

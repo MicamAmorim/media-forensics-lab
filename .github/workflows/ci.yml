@@ -1,29 +1,122 @@
 name: CI
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
-  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: test-${{ matrix.os }}-py${{ matrix.python-version }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12"]
     runs-on: ${{ matrix.os }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
-          pip install -e . --no-deps --no-build-isolation
-      - name: Build demo dataset
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+
+      - name: Version consistency gate
+        run: python scripts/check_version.py
+
+      - name: Compile source tree
+        run: python -m compileall -q mf_lab scripts tests
+
+      - name: Build controlled demo fixtures
         run: python scripts/build_demo_dataset.py
-      - name: Run tests
+
+      - name: Ensure canonical GT was not rewritten
+        run: git diff --exit-code -- dataset/demo/ground_truth.json
+
+      - name: Run automated tests
         run: pytest -q
+
+      - name: Ground-truth 100 percent gate
+        run: python scripts/ci_validate_gt.py --out validation/demo_validation.json
+
+      - name: Dependency consistency
+        run: python -m pip check
+
+      - name: Upload GT validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gt-validation-${{ runner.os }}-py${{ matrix.python-version }}
+          path: validation/demo_validation.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  package:
+    name: package-smoke
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python scripts/check_version.py
+          python -m build
+
+      - name: Install built wheel and smoke test CLI
+        run: |
+          python -m pip install dist/*.whl
+          mflab --help
+          python -c "from importlib.metadata import version; from mf_lab.version import __version__; assert version('media-forensics-lab') == __version__"
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: [test, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI stage to pass
+        shell: bash
+        run: |
+          echo "matrix=${{ needs.test.result }}"
+          echo "package=${{ needs.package.result }}"
+          test "${{ needs.test.result }}" = "success"
+          test "${{ needs.package.result }}" = "success"

@@ -30,6 +30,7 @@ from mf_lab.analysis.reference import reference_image_difference, reference_vide
 from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
 from mf_lab.utils.io import sha256, write_json
+from mf_lab.version import __version__
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp", ".heic", ".heif"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mts", ".m2ts"}
@@ -75,7 +76,7 @@ def _environment() -> dict:
     return {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
-        "mflab_version": "0.4.0",
+        "mflab_version": __version__,
         "veritas_integration": veritas_status(),
     }
 
@@ -153,7 +154,6 @@ def analyze_file(
             _safe_method(m, "copy_move_orb", copy_move_orb, path)
             _safe_method(m, "steganography_lsb", lsb_steganography_screen, path)
 
-        # The protocol reuses precomputed evidence families where possible.
         if reference_path is not None:
             _safe_method(m, "reference_image_difference", reference_image_difference, path, reference_path)
 
@@ -168,8 +168,6 @@ def analyze_file(
         _safe_method(m, "deepfake_protocol", image_deepfake_protocol, path, precomputed, external_models)
 
         if run_veritas:
-            # Third-party code is never executed by default. This explicit mode
-            # allows reproducible cross-checking after the checkout is pinned.
             _safe_method(m, "veritas_upstream_crosscheck", run_veritas_all, path)
 
     report["method_registry"] = {k: METHODS[k] for k in m if k in METHODS}

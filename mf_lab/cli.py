@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
 from mf_lab.integrations.deepfakebench import status as deepfakebench_status
 from mf_lab.integrations.veritas import status as veritas_status
@@ -36,6 +35,11 @@ def main():
     p.add_argument("--dataset", default=None, help="Optional demo dataset directory")
     p.add_argument("--out", default="validation/demo_validation.json")
 
+    p = sp.add_parser("web", help="Launch the local interactive HTML forensic report")
+    p.add_argument("--host", default="127.0.0.1", help="Bind address; keep 127.0.0.1 for local-only use")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--debug", action="store_true")
+
     a = ap.parse_args()
     if a.cmd == "analyze-file":
         analyze_file(a.file, a.out, profile=a.profile, run_veritas=a.veritas)
@@ -49,6 +53,9 @@ def main():
         result = validate_demo(a.dataset, a.out)
         print(json.dumps(result["summary"], indent=2, ensure_ascii=False))
         print(f"validation_report={a.out}")
+    elif a.cmd == "web":
+        from mf_lab.webapp import run_web
+        run_web(host=a.host, port=a.port, debug=a.debug)
 
 
 if __name__ == "__main__":
