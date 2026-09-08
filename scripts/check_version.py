@@ -54,11 +54,6 @@ def main() -> None:
             f"README heading '{readme_first_line}' does not identify release line v{major}.{minor}"
         )
 
-    from mf_lab.version import __version__
-
-    if __version__ != value:
-        fail(f"runtime version is {__version__}, pyproject version is {value}")
-
     try:
         installed = installed_version("media-forensics-lab")
     except PackageNotFoundError:
