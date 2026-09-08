@@ -48,22 +48,23 @@ def test_prnu_is_explicitly_screening_only():
 def test_copy_move_screening_runs():
     r = copy_move_orb(D / "images" / "img_002_copy_move.jpg")
     assert r["keypoints"] > 0
+    assert r["status"] == "screening_only"
 
 
-def test_duplicate_frames_detected():
+def test_duplicate_frames_screening_runs():
     r = frame_hash_duplicates(D / "videos" / "vid_002_duplicated_frames.mp4")
     assert r["duplicate_count"] >= 1
 
 
 def test_image_deepfake_protocol_never_auto_verdicts():
     r = image_deepfake_protocol(D / "images" / "img_001_pristine.jpg")
-    assert r["protocol_version"] == "MFLAB-DF-0.2"
+    assert r["protocol_version"] == "MFLAB-DF-0.3"
     assert r["evidentiary_conclusion"] == "inconclusive"
 
 
 def test_video_deepfake_protocol_never_auto_verdicts():
     r = video_deepfake_protocol(D / "videos" / "vid_001_pristine.mp4")
-    assert r["protocol_version"] == "MFLAB-DF-0.2"
+    assert r["protocol_version"] == "MFLAB-DF-0.3"
     assert r["evidentiary_conclusion"] == "inconclusive"
 
 
@@ -102,12 +103,10 @@ def test_opencv_reads_non_ascii_path(tmp_path):
 def test_windows_haar_cascade_recovers_from_mojibake_path():
     """The built-in cascade must still load if cv2.data returns a mangled path."""
     import os
-
     if os.name != "nt":
         return
 
     import cv2
-
     bogus = r"Z:\Per├¡cia Digital\cv2\data\haarcascade_frontalface_default.xml"
     cascade = cv2.CascadeClassifier(bogus)
     assert not cascade.empty()

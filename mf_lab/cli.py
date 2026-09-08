@@ -8,6 +8,7 @@ from mf_lab.integrations.deepfakebench import status as deepfakebench_status
 from mf_lab.integrations.veritas import status as veritas_status
 from mf_lab.pipeline import PROFILES, analyze_case, analyze_file
 from mf_lab.report.generator import generate_preliminary_report
+from mf_lab.validation import validate_demo
 
 
 def main():
@@ -31,6 +32,10 @@ def main():
 
     sp.add_parser("integrations", help="Show optional upstream integration status")
 
+    p = sp.add_parser("validate-demo", help="Run controlled regression validation against dataset/demo ground truth")
+    p.add_argument("--dataset", default=None, help="Optional demo dataset directory")
+    p.add_argument("--out", default="validation/demo_validation.json")
+
     a = ap.parse_args()
     if a.cmd == "analyze-file":
         analyze_file(a.file, a.out, profile=a.profile, run_veritas=a.veritas)
@@ -40,6 +45,10 @@ def main():
         print(generate_preliminary_report(a.case_dir, a.format))
     elif a.cmd == "integrations":
         print(json.dumps({"veritas": veritas_status(), "deepfakebench": deepfakebench_status()}, indent=2, ensure_ascii=False))
+    elif a.cmd == "validate-demo":
+        result = validate_demo(a.dataset, a.out)
+        print(json.dumps(result["summary"], indent=2, ensure_ascii=False))
+        print(f"validation_report={a.out}")
 
 
 if __name__ == "__main__":

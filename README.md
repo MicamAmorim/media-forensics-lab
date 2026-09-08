@@ -1,21 +1,20 @@
-# Media Forensics Lab (Python) - v0.2
+# Media Forensics Lab (Python) - v0.3
 
 Laboratório educacional/de pesquisa para **análise reproduzível de autenticidade, manipulação e mídia sintética (IA/deepfake)** em imagens e vídeos, com geração de **laudo técnico preliminar** e rastreabilidade método → referência bibliográfica.
 
 > **Regra central:** o laboratório não transforma um escore isolado em conclusão pericial. ELA, histogramas, ruído, FFT, PRNU simplificado, detectores de IA e outros sinais são interpretados em conjunto com proveniência, estrutura, contexto e cadeia de custódia.
 
-## O que mudou na v0.2
+## O que mudou na v0.3
 
-- protocolo `MFLAB-DF-0.2` para imagem e vídeo;
-- C2PA/Content Credentials via `c2patool` quando instalado;
-- histogramas, JPEG Ghost, tabelas de quantização, FFT, reamostragem, LSB/steganalysis, hashes perceptuais e residual tipo PRNU;
-- análise de regiões faciais e consistência temporal **sem fingir** que heurísticas equivalem a um detector deep-learning;
-- ingestão de resultados de modelos externos validados em `case/external/deepfake_scores.json`;
-- integração opcional com **DeepfakeBench**;
-- integração opcional e auditável com **CodeRafay/Forensic-Image-Analysis-Toolkit (Veritas)**;
-- documentação de limitações encontradas no upstream;
-- GitHub Actions CI;
-- laudo atualizado com seção específica de mídia sintética/deepfake.
+- protocolo `MFLAB-DF-0.3`: heurísticas nativas não calibradas passam a ser **observações de triagem**, sem elevar por si só o caso a evidência de deepfake;
+- correção do copy-move ORB: auto-matching deixa de ser bloqueado por identidade e passa a usar vizinhos não-idênticos + agrupamento geométrico por translação;
+- detector de transições visuais abruptas em vídeo para triagem de overlays/cortes;
+- resampling passa a expor persistência de autocorrelação de curto lag em vez de tratar correlação de lag 1 como discriminativa;
+- `mflab validate-demo`: harness de validação regressiva contra o `ground_truth.json` controlado;
+- ground truth enriquecido com translação conhecida do copy-move, índices exatos de frames duplicados e fronteiras do overlay;
+- testes passam a verificar **detecção conhecida**, e não apenas se a função executou;
+- lacunas atuais são registradas explicitamente como `unsupported` em vez de serem escondidas: localização de splice, inpainting e deleção de segmento após re-encode;
+- permanecem as integrações opcionais com C2PA, DeepfakeBench e CodeRafay/Veritas.
 
 ## Funcionalidades
 
@@ -39,6 +38,8 @@ Laboratório educacional/de pesquisa para **análise reproduzível de autenticid
 | Deepfake/GAN heurístico | ✅, sem probabilidade | ✅, secundário | triagem |
 | Deepfake aprendido | por resultados externos | DeepfakeBench | camada validada separada |
 | Vídeo: timestamps/frames | ✅ | upstream é focado em imagem | análise temporal |
+| Vídeo: transições abruptas | ✅ | — | triagem de overlay/corte |
+| Harness de validação demo | ✅ | — | regressão controlada contra ground truth |
 | Laudo DOCX/Markdown | ✅ | — | consolidação |
 
 ## Estrutura
@@ -69,7 +70,14 @@ media-forensics-lab/
 ```bash
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e .[test]   #pip install -r .\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
+pip install -e .[test]
+```
+
+Se o Windows apresentar erro de certificado TLS ao acessar o PyPI:
+
+```powershell
+pip install -r .\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
+pip install -e . --no-deps --no-build-isolation
 ```
 
 Dependências de sistema recomendadas:
@@ -83,9 +91,12 @@ Dependências de sistema recomendadas:
 ```bash
 python scripts/build_demo_dataset.py
 pytest -q
+mflab validate-demo --out validation/demo_validation.json
 ```
 
-O `dataset/demo/ground_truth.json` registra adulterações controladas: copy-move, splice, double JPEG, resampling, inpainting, duplicação de frames, remoção de segmento e overlay.
+`pytest` responde principalmente se as rotinas e regressões codificadas estão funcionando. `mflab validate-demo` confronta as saídas do pipeline com o `dataset/demo/ground_truth.json` e informa separadamente checks aprovados, falhos e capacidades ainda não implementadas.
+
+O ground truth registra adulterações controladas: copy-move, splice, double JPEG, resampling, inpainting, duplicação de frames, remoção de segmento e overlay. **Essa base pequena não estima sensibilidade, especificidade, FPR/FNR ou validade pericial real.** Ela serve para regressão de engenharia e coerência com manipulações conhecidas.
 
 Para um pequeno conjunto externo AI-vs-real, em ambiente com Internet:
 
@@ -140,7 +151,7 @@ convergência + revisão humana
 conclusão documentada
 ```
 
-O resultado automático nativo mantém `evidentiary_conclusion: inconclusive`. Isso é intencional: o raciocínio pericial final pertence ao examinador e precisa considerar validação do método e o contexto do caso.
+O resultado automático nativo mantém `evidentiary_conclusion: inconclusive`. Heurísticas não calibradas podem aparecer em `screening_observations`, mas não acionam sozinhas `needs_expert_review`. Isso é intencional: o raciocínio pericial final pertence ao examinador e precisa considerar validação do método e o contexto do caso.
 
 ### Importar resultados de modelos aprendidos
 

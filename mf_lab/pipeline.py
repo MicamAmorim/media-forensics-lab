@@ -25,7 +25,7 @@ from mf_lab.analysis.deepfake import (
 )
 from mf_lab.analysis.image import copy_move_orb, ela, jpeg_dct_periodicity, noise_residual_stats
 from mf_lab.analysis.metadata import image_metadata, video_metadata
-from mf_lab.analysis.video import frame_hash_duplicates, frame_timing
+from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies
 from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
 from mf_lab.utils.io import sha256, write_json
@@ -55,6 +55,7 @@ METHODS = {
     "deepfake_protocol": {"refs": ["verdoliva_2020", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020"]},
     "video_timing": {"refs": ["swgde_video_auth", "swgde_ffmpeg"]},
     "video_duplicates": {"refs": ["swgde_video_auth"], "screening_only": True},
+    "video_transition_anomalies": {"refs": ["swgde_video_auth"], "screening_only": True},
     "video_deepfake_protocol": {"refs": ["swgde_video_auth", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020"]},
     "veritas_upstream_crosscheck": {"refs": ["veritas_2025"], "screening_only": True, "secondary_implementation": True},
 }
@@ -70,7 +71,7 @@ def _environment() -> dict:
     return {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
-        "mflab_version": "0.2.0",
+        "mflab_version": "0.3.0",
         "veritas_integration": veritas_status(),
     }
 
@@ -117,6 +118,7 @@ def analyze_file(
         _safe_method(m, "metadata", video_metadata, path)
         _safe_method(m, "video_timing", frame_timing, path)
         _safe_method(m, "video_duplicates", frame_hash_duplicates, path)
+        _safe_method(m, "video_transition_anomalies", frame_transition_anomalies, path)
         _safe_method(m, "video_deepfake_protocol", video_deepfake_protocol, path, external_models)
     elif is_image:
         _safe_method(m, "metadata", image_metadata, path)
@@ -143,7 +145,6 @@ def analyze_file(
             _safe_method(m, "copy_move_orb", copy_move_orb, path)
             _safe_method(m, "steganography_lsb", lsb_steganography_screen, path)
 
-        # The protocol reuses precomputed evidence families where possible.
         precomputed = {
             "noise_map": m.get("noise_map"),
             "resampling": m.get("resampling"),
@@ -154,8 +155,6 @@ def analyze_file(
         _safe_method(m, "deepfake_protocol", image_deepfake_protocol, path, precomputed, external_models)
 
         if run_veritas:
-            # Third-party code is never executed by default. This explicit mode
-            # allows reproducible cross-checking after the checkout is pinned.
             _safe_method(m, "veritas_upstream_crosscheck", run_veritas_all, path)
 
     report["method_registry"] = {k: METHODS[k] for k in m if k in METHODS}

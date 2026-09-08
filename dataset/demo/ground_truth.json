@@ -6,7 +6,23 @@
     "img_002_copy_move.jpg": {
       "label": "manipulated",
       "method": "copy_move",
-      "mask": "../masks/img_002_copy_move_mask.png"
+      "mask": "../masks/img_002_copy_move_mask.png",
+      "source_bbox": [
+        70,
+        90,
+        170,
+        190
+      ],
+      "destination_bbox": [
+        300,
+        330,
+        400,
+        430
+      ],
+      "expected_translation_px": [
+        230,
+        240
+      ]
     },
     "img_003_splice.jpg": {
       "label": "manipulated",
@@ -33,16 +49,43 @@
     },
     "vid_002_duplicated_frames.mp4": {
       "label": "manipulated",
-      "method": "frame_duplication"
+      "method": "frame_duplication",
+      "expected_duplicate_transitions": [
+        36,
+        37,
+        38,
+        39,
+        40
+      ]
     },
     "vid_003_deleted_segment.mp4": {
       "label": "manipulated",
-      "method": "segment_deletion_then_reencode"
+      "method": "segment_deletion_then_reencode",
+      "deleted_source_frames": [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
     },
     "vid_004_overlay_edit.mp4": {
       "label": "manipulated",
-      "method": "overlay_then_reencode"
+      "method": "overlay_then_reencode",
+      "overlay_frame_range": [
+        25,
+        49
+      ],
+      "expected_abrupt_transitions": [
+        25,
+        50
+      ]
     }
   },
-  "note": "Controlled educational ground truth. It validates pipeline mechanics, not real-world error rates."
+  "note": "Controlled educational ground truth. It validates pipeline mechanics and regression behavior only, not real-world error rates or forensic validity."
 }

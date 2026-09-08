@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 - 2026-09-08
+
+### Added
+- Controlled validation harness via `mflab validate-demo`.
+- Exact fixture expectations for copy-move translation, duplicated-frame indices and overlay transition boundaries.
+- Abrupt visual-transition screening for video.
+
+### Changed
+- Copy-move ORB now suppresses identity matches and clusters coherent translations.
+- Deepfake protocol upgraded to MFLAB-DF-0.3: uncalibrated native heuristics are recorded as screening observations and cannot alone trigger a deepfake-specific escalation.
+- Resampling screening uses short-lag persistence instead of treating raw lag-1 autocorrelation as discriminative.
+- Preliminary report now surfaces copy-move and abrupt-transition findings without falsely escalating pristine imagery as deepfake evidence.
+- Project version bumped to 0.3.0.
+
+### Validation
+- 22 automated tests pass in the internal Linux environment.
+- Demo harness: 9/9 required regression checks pass; 3 capability gaps are explicitly marked unsupported.
+- Regenerated DOCX report rendered to 21 pages and visually reviewed; no clipping/overlap observed.
+
 ## 0.2.0 - 2026-09-08
 
 ### Added

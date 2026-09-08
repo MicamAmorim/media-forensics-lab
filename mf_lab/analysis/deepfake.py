@@ -34,7 +34,6 @@ def face_artifact_screen(path: str | Path) -> dict:
         left = crop[:, :max(1, w // 2)]
         right = crop[:, w // 2:]
         illum_asym = abs(float(left.mean()) - float(right.mean())) / 255.0 if right.size else 0.0
-        # Boundary sharpness: compare a thin outer ring to face interior.
         ring = max(2, min(w, h) // 16)
         edges = cv2.Canny(crop, 80, 160).astype(np.float32) / 255.0
         border_mask = np.zeros_like(edges, dtype=bool)
@@ -59,7 +58,6 @@ def face_artifact_screen(path: str | Path) -> dict:
 
 def synthetic_spectral_screen(path: str | Path) -> dict:
     f = frequency_analysis(path)
-    # Do not convert heuristics into a probability. We expose signal flags only.
     flags = []
     if f.get("spectral_peak_count", 0) >= 4:
         flags.append("multiple_radial_spectral_peaks")
@@ -73,18 +71,12 @@ def synthetic_spectral_screen(path: str | Path) -> dict:
         "features": f,
         "screening_flags": flags,
         "status": "screening_only",
-        "warning": "Spectral fingerprints are generator- and post-processing-dependent. A flag is not a probability that the image was AI-generated.",
+        "calibrated": False,
+        "warning": "Spectral fingerprints are generator- and post-processing-dependent. These flags are uncalibrated observations and are not a probability that the image was AI-generated.",
     }
 
 
 def image_deepfake_protocol(path: str | Path, precomputed: dict | None = None, external_models: list[dict] | None = None) -> dict:
-    """Multi-family synthetic/deepfake screening protocol for still images.
-
-    The protocol is designed for forensic discipline rather than a single
-    'AI score'. It records independent evidence families and leaves the
-    evidentiary conclusion inconclusive unless a qualified examiner combines
-    validated model outputs, provenance and case context.
-    """
     precomputed = precomputed or {}
     external_models = external_models or []
     spectral = precomputed.get("synthetic_spectral") or synthetic_spectral_screen(path)
@@ -93,28 +85,39 @@ def image_deepfake_protocol(path: str | Path, precomputed: dict | None = None, e
     resampling = precomputed.get("resampling") or resampling_analysis(path)
     prnu = precomputed.get("prnu_screen") or prnu_screen(path)
 
-    evidence = []
+    screening_observations = []
     if spectral.get("screening_flags"):
-        evidence.append({"family": "frequency", "signals": spectral["screening_flags"], "strength": "screening"})
+        screening_observations.append({"family": "frequency", "signals": spectral["screening_flags"], "calibrated": False})
     if noise.get("local_std_cv", 0) > 0.75:
-        evidence.append({"family": "noise_consistency", "signals": ["high_local_residual_variability"], "strength": "screening"})
-    if resampling.get("max_nonzero_autocorrelation", 0) > 0.35:
-        evidence.append({"family": "resampling", "signals": ["periodic_second_derivative_autocorrelation"], "strength": "screening"})
+        screening_observations.append({"family": "noise_consistency", "signals": ["high_local_residual_variability"], "calibrated": False})
+    if resampling.get("screening_flag") is True:
+        screening_observations.append({"family": "resampling", "signals": ["short_lag_derivative_persistence"], "calibrated": False})
     if prnu.get("local_energy_cv", 0) > 0.75:
-        evidence.append({"family": "sensor_residual", "signals": ["high_local_residual_energy_variability"], "strength": "screening"})
+        screening_observations.append({"family": "sensor_residual", "signals": ["high_local_residual_energy_variability"], "calibrated": False})
 
     validated_model_outputs = []
+    evidence = []
     for model in external_models:
         if model.get("validated") is True and model.get("score") is not None:
             validated_model_outputs.append(model)
+            evidence.append({
+                "family": "validated_learned_detector",
+                "model": model.get("model") or model.get("name"),
+                "score": model.get("score"),
+                "label": model.get("label"),
+                "validation": model.get("validation") or model.get("dataset") or model.get("protocol"),
+                "strength": "model_output_requires_case_interpretation",
+            })
 
-    if evidence or validated_model_outputs:
+    if validated_model_outputs:
         triage = "needs_expert_review"
+    elif screening_observations:
+        triage = "screening_observations_only"
     else:
         triage = "no_strong_screening_signals"
 
     return {
-        "protocol_version": "MFLAB-DF-0.2",
+        "protocol_version": "MFLAB-DF-0.3",
         "media_type": "image",
         "stages": [
             "integrity_and_provenance",
@@ -125,12 +128,13 @@ def image_deepfake_protocol(path: str | Path, precomputed: dict | None = None, e
             "validated_external_model_ensemble_when_configured",
             "manual_cross-method_review",
         ],
+        "screening_observations": screening_observations,
         "evidence_families": evidence,
         "external_models": external_models,
         "validated_external_models": len(validated_model_outputs),
         "triage_assessment": triage,
         "evidentiary_conclusion": "inconclusive",
-        "decision_policy": "Do not label authentic/AI-generated from a single heuristic or classifier. Seek convergence across independent evidence families and provenance/context.",
+        "decision_policy": "Uncalibrated native heuristics are observations only and cannot trigger a deepfake-specific evidentiary escalation. Do not label authentic/AI-generated from a single heuristic or classifier; seek validated model/domain evidence plus provenance and contextual convergence.",
         "limitations": [
             "Unknown generators and domain shift can defeat learned detectors.",
             "JPEG recompression, screenshots and social networks may erase or create artifacts.",
@@ -141,12 +145,6 @@ def image_deepfake_protocol(path: str | Path, precomputed: dict | None = None, e
 
 
 def video_deepfake_screen(path: str | Path, samples: int = 24) -> dict:
-    """Temporal face/frequency consistency screening for video.
-
-    This is not a deep-learning detector. It measures sample-to-sample changes
-    that may justify escalation to a validated video detector (e.g. a
-    DeepfakeBench video model) and manual frame review.
-    """
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         return {"status": "error", "error": "could_not_open_video"}
@@ -168,12 +166,7 @@ def video_deepfake_screen(path: str | Path, samples: int = 24) -> dict:
         if len(faces):
             x, y, w, h = max(faces, key=lambda z: z[2] * z[3])
             crop = gray[y:y + h, x:x + w]
-            face_metric = {
-                "bbox": [int(x), int(y), int(w), int(h)],
-                "sharpness": float(cv2.Laplacian(crop, cv2.CV_32F).var()),
-                "mean_luminance": float(crop.mean()),
-            }
-        # simple frame spectral ratio
+            face_metric = {"bbox": [int(x), int(y), int(w), int(h)], "sharpness": float(cv2.Laplacian(crop, cv2.CV_32F).var()), "mean_luminance": float(crop.mean())}
         small = cv2.resize(gray, (256, 256), interpolation=cv2.INTER_AREA).astype(np.float32)
         dct = cv2.dct(small)
         low = float(np.mean(np.abs(dct[:64, :64])))
@@ -186,61 +179,30 @@ def video_deepfake_screen(path: str | Path, samples: int = 24) -> dict:
     ratios = [r["hf_lf_dct_ratio"] for r in rows]
     def cv(vals):
         return float(np.std(vals) / (np.mean(vals) + 1e-12)) if vals else None
-    metrics = {
-        "sampled_frames": len(rows),
-        "frames_with_face": sum(1 for r in rows if r["face"]),
-        "face_sharpness_cv": cv(sharp),
-        "face_luminance_cv": cv(lum),
-        "spectral_ratio_cv": cv(ratios),
-    }
+    metrics = {"sampled_frames": len(rows), "frames_with_face": sum(1 for r in rows if r["face"]), "face_sharpness_cv": cv(sharp), "face_luminance_cv": cv(lum), "spectral_ratio_cv": cv(ratios)}
     flags = []
     if metrics["face_sharpness_cv"] is not None and metrics["face_sharpness_cv"] > 1.0:
         flags.append("large_face_texture_sharpness_variation")
     if metrics["spectral_ratio_cv"] is not None and metrics["spectral_ratio_cv"] > 0.75:
         flags.append("large_sampled_frequency_variation")
-    return {
-        "status": "screening_only",
-        "metrics": metrics,
-        "screening_flags": flags,
-        "samples": rows,
-        "triage_assessment": "needs_expert_review" if flags else "no_strong_screening_signals",
-        "evidentiary_conclusion": "inconclusive",
-        "warning": "Escalate suspicious cases to validated frame/video deepfake models and manual temporal review. This module does not infer blinking or micro-expressions.",
-    }
+    return {"status": "screening_only", "metrics": metrics, "screening_flags": flags, "samples": rows,
+            "triage_assessment": "needs_expert_review" if flags else "no_strong_screening_signals", "evidentiary_conclusion": "inconclusive",
+            "warning": "Escalate suspicious cases to validated frame/video deepfake models and manual temporal review. This module does not infer blinking or micro-expressions."}
 
 
 def video_deepfake_protocol(path: str | Path, external_models: list[dict] | None = None) -> dict:
-    """Forensic wrapper around temporal screening + optional validated models."""
     external_models = external_models or []
     screen = video_deepfake_screen(path)
     validated = [m for m in external_models if m.get("validated") is True and m.get("score") is not None]
     evidence = []
     if screen.get("screening_flags"):
-        evidence.append({
-            "family": "temporal_frequency_face_consistency",
-            "signals": screen.get("screening_flags", []),
-            "strength": "screening",
-        })
+        evidence.append({"family": "temporal_frequency_face_consistency", "signals": screen.get("screening_flags", []), "strength": "screening"})
     for m in validated:
-        evidence.append({
-            "family": "validated_learned_detector",
-            "model": m.get("model") or m.get("name"),
-            "score": m.get("score"),
-            "label": m.get("label"),
-            "validation": m.get("validation") or m.get("protocol"),
-            "strength": "model_output_requires_case_interpretation",
-        })
+        evidence.append({"family": "validated_learned_detector", "model": m.get("model") or m.get("name"), "score": m.get("score"), "label": m.get("label"), "validation": m.get("validation") or m.get("protocol"), "strength": "model_output_requires_case_interpretation"})
     return {
-        "protocol_version": "MFLAB-DF-0.2",
+        "protocol_version": "MFLAB-DF-0.3",
         "media_type": "video",
-        "stages": [
-            "integrity_and_provenance",
-            "container_codec_timestamps_and_gop",
-            "frame_sampling_and_temporal_consistency_screening",
-            "validated_external_video_detector_ensemble_when_configured",
-            "manual_frame_sequence_review",
-            "cross_method_and_contextual_convergence",
-        ],
+        "stages": ["integrity_and_provenance", "container_codec_timestamps_and_gop", "frame_sampling_and_temporal_consistency_screening", "validated_external_video_detector_ensemble_when_configured", "manual_frame_sequence_review", "cross_method_and_contextual_convergence"],
         "native_screen": screen,
         "external_models": external_models,
         "validated_external_models": len(validated),
@@ -248,10 +210,5 @@ def video_deepfake_protocol(path: str | Path, external_models: list[dict] | None
         "triage_assessment": "needs_expert_review" if evidence else "no_strong_screening_signals",
         "evidentiary_conclusion": "inconclusive",
         "decision_policy": "No single frame-level or video-level score is converted into a forensic conclusion. Validate detector/domain and seek convergence with provenance, encoding, temporal and contextual evidence.",
-        "limitations": [
-            "Frame sampling may miss short manipulated intervals.",
-            "Compression and transcoding can mask or create temporal/frequency artifacts.",
-            "Detector performance may collapse under domain shift or unseen generators.",
-            "Absence of a detected artifact is not proof of authenticity.",
-        ],
+        "limitations": ["Frame sampling may miss short manipulated intervals.", "Compression and transcoding can mask or create temporal/frequency artifacts.", "Detector performance may collapse under domain shift or unseen generators.", "Absence of a detected artifact is not proof of authenticity."],
     }
