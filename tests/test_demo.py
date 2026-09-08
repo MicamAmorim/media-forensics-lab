@@ -97,3 +97,17 @@ def test_opencv_reads_non_ascii_path(tmp_path):
     copy2(src, dst)
     r = histogram_analysis(dst)
     assert set(r["channels"]) == {"R", "G", "B"}
+
+
+def test_windows_haar_cascade_recovers_from_mojibake_path():
+    """The built-in cascade must still load if cv2.data returns a mangled path."""
+    import os
+
+    if os.name != "nt":
+        return
+
+    import cv2
+
+    bogus = r"Z:\Per├¡cia Digital\cv2\data\haarcascade_frontalface_default.xml"
+    cascade = cv2.CascadeClassifier(bogus)
+    assert not cascade.empty()
