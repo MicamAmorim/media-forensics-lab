@@ -69,7 +69,7 @@ media-forensics-lab/
 ```bash
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e .[test]
+pip install -e .[test]   #pip install -r .\requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
 ```
 
 Dependências de sistema recomendadas:
