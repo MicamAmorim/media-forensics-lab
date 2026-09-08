@@ -1,4 +1,4 @@
-# MFLab Deepfake / Synthetic Media Protocol — MFLAB-DF-0.2
+# MFLab Deepfake / Synthetic Media Protocol — MFLAB-DF-0.3
 
 The protocol deliberately avoids a single "AI probability". A forensic conclusion should be based on provenance, file/encoding history, classical image/video forensics, validated learned detectors, and human review.
 
@@ -36,7 +36,7 @@ The protocol deliberately avoids a single "AI probability". A forensic conclusio
 - Sampled frequency consistency.
 - Temporal structure and duplicate/gap analysis.
 
-These native modules are **screening only**. They do not produce an evidentiary AI probability.
+These native modules are **screening only**. In v0.3 their outputs are stored as `screening_observations`; because they are not calibrated to a target population/domain, they do **not** by themselves trigger `needs_expert_review` as deepfake evidence and do not produce an evidentiary AI probability.
 
 ## Stage 4 — Validated learned detectors
 
@@ -73,7 +73,7 @@ Example schema:
 
 The examiner should ask whether apparently independent findings may share one cause (for example, WhatsApp recompression can affect noise, JPEG and spectral features together). Independence cannot be assumed just because different scripts produced different numbers.
 
-Native MFLab heuristics end with `evidentiary_conclusion: inconclusive`. A stronger conclusion belongs in the examiner's reasoning, not in an automatic score.
+Native MFLab heuristics end with `evidentiary_conclusion: inconclusive`. Uncalibrated screening observations remain distinct from validated evidence families. A stronger conclusion belongs in the examiner's reasoning, supported by documented validation and case context, not in an automatic score.
 
 ## Stage 6 — Report language
 
@@ -89,3 +89,14 @@ Avoid:
 - "97% AI, therefore fake."
 - "ELA proves Photoshop."
 - "Weak PRNU proves synthetic image."
+
+
+## Controlled regression validation
+
+Run:
+
+```bash
+mflab validate-demo --out validation/demo_validation.json
+```
+
+The bundled demo ground truth checks known injected transformations (for example copy-move translation and duplicated-frame positions) and verifies that the pristine fixture is not falsely escalated by the deepfake protocol. This is a **regression harness**, not a measurement of real-world sensitivity, specificity, false-positive rate or admissibility. Unsupported capabilities are reported explicitly rather than counted as successful detections.

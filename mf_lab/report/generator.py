@@ -36,6 +36,7 @@ METHOD_LABELS = {
     "deepfake_protocol": "Protocolo MFLAB-DF para imagem",
     "video_timing": "Estrutura temporal / timestamps",
     "video_duplicates": "Frames adjacentes quase duplicados",
+    "video_transition_anomalies": "Transições visuais abruptas - triagem",
     "video_deepfake_protocol": "Protocolo MFLAB-DF para vídeo",
     "veritas_upstream_crosscheck": "Cross-check opcional CodeRafay/Veritas",
 }
@@ -81,9 +82,10 @@ def _deepfake_summary(report: dict) -> str | None:
     triage = proto.get("triage_assessment", "não informado")
     validated = proto.get("validated_external_models", 0)
     families = proto.get("evidence_families", []) or []
+    observations = proto.get("screening_observations", []) or []
     conclusion = proto.get("evidentiary_conclusion", "inconclusivo")
     return (
-        f"{version}: triagem={triage}; famílias de evidência sinalizadas={len(families)}; "
+        f"{version}: triagem={triage}; observações heurísticas não calibradas={len(observations)}; famílias de evidência validadas/sinalizadas={len(families)}; "
         f"modelos externos explicitamente marcados como validados={validated}; "
         f"conclusão automática de valor probatório={conclusion}."
     )
@@ -99,6 +101,7 @@ def _assessment(reports):
         cm = m.get("copy_move_orb", {}).get("score", 0)
         gaps = len(m.get("video_timing", {}).get("large_gaps", []))
         dups = m.get("video_duplicates", {}).get("duplicate_count", 0)
+        abrupt = m.get("video_transition_anomalies", {}).get("anomaly_count", 0)
         proto = m.get("deepfake_protocol") or m.get("video_deepfake_protocol") or {}
         if cm >= 0.5:
             flags.append(f"{name}: elevada quantidade de correspondências ORB compatíveis com copy-move em triagem.")
@@ -106,6 +109,9 @@ def _assessment(reports):
             flags.append(f"{name}: {gaps} descontinuidade(s) temporal(is) potencial(is) segundo a análise de timestamps.")
         if dups:
             flags.append(f"{name}: {dups} transição(ões) entre frames adjacentes atingiram o limiar de quase-duplicação e exigem confirmação visual.")
+        if abrupt:
+            idx = [x.get("index") for x in m.get("video_transition_anomalies", {}).get("anomalous_transitions", [])]
+            flags.append(f"{name}: {abrupt} transição(ões) visual(is) abrupta(s) foram sinalizadas nos índices {idx}; cortes, overlays e mudanças legítimas de cena devem ser diferenciados por revisão visual.")
         if proto.get("triage_assessment") == "needs_expert_review":
             flags.append(f"{name}: o protocolo {proto.get('protocol_version', 'MFLAB-DF')} identificou sinais que justificam revisão pericial aprofundada, sem classificá-los isoladamente como deepfake/IA.")
     if not flags:
@@ -149,6 +155,7 @@ def _short_result(method: str, value) -> str:
         compact = {
             "protocol_version": value.get("protocol_version"),
             "triage_assessment": value.get("triage_assessment"),
+            "screening_observations": value.get("screening_observations"),
             "evidence_families": value.get("evidence_families"),
             "validated_external_models": value.get("validated_external_models"),
             "evidentiary_conclusion": value.get("evidentiary_conclusion"),
@@ -187,7 +194,7 @@ def _short_result(method: str, value) -> str:
         compact={"screening_flags":value.get("screening_flags", []), "high_low_frequency_ratio":f.get("high_low_frequency_ratio"), "spectral_peak_count":f.get("spectral_peak_count"), "quadrant_mean_cv":f.get("quadrant_mean_cv")}
         return json.dumps(compact, ensure_ascii=False)
     if method == "resampling":
-        return json.dumps({"max_nonzero_autocorrelation": value.get("max_nonzero_autocorrelation")}, ensure_ascii=False)
+        return json.dumps({k: value.get(k) for k in ("max_nonzero_autocorrelation", "short_lag_persistence", "screening_flag", "screening_threshold", "status")}, ensure_ascii=False)
     if method == "jpeg_ghost":
         return json.dumps({"minimum_error_quality": value.get("minimum_error_quality"), "minimum_mean_abs_error": value.get("minimum_mean_abs_error")}, ensure_ascii=False)
     if method == "jpeg_quantization":
@@ -203,6 +210,8 @@ def _short_result(method: str, value) -> str:
         return json.dumps({k:value.get(k) for k in ("frame_count","timestamp_count","large_gaps","i_frames")}, ensure_ascii=False)[:700]
     if method == "video_duplicates":
         return json.dumps({k:value.get(k) for k in ("frame_count","duplicate_count","adjacent_near_duplicates","mad_threshold","median_adjacent_mad")}, ensure_ascii=False)[:700]
+    if method == "video_transition_anomalies":
+        return json.dumps({k:value.get(k) for k in ("frame_count","anomaly_count","anomalous_transitions","threshold","median_transition_mad","status")}, ensure_ascii=False)[:700]
     if method == "veritas_upstream_crosscheck":
         results=value.get("results", {})
         compact={"status":value.get("status"), "features":{k:v.get("status") if isinstance(v,dict) else None for k,v in results.items()}}

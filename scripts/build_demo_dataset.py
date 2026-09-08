@@ -49,13 +49,13 @@ def main():
     write_video('vid_004_overlay_edit.mp4',overlay)
     gt={
       'images':{
-       'img_001_pristine.jpg':{'label':'pristine'},'img_002_copy_move.jpg':{'label':'manipulated','method':'copy_move','mask':'../masks/img_002_copy_move_mask.png'},
+       'img_001_pristine.jpg':{'label':'pristine'},'img_002_copy_move.jpg':{'label':'manipulated','method':'copy_move','mask':'../masks/img_002_copy_move_mask.png','source_bbox':[70,90,170,190],'destination_bbox':[300,330,400,430],'expected_translation_px':[230,240]},
        'img_003_splice.jpg':{'label':'manipulated','method':'splice','mask':'../masks/img_003_splice_mask.png'},'img_004_double_jpeg.jpg':{'label':'processed','method':'double_jpeg'},
        'img_005_resampled.jpg':{'label':'processed','method':'resampling'},'img_006_inpainted.jpg':{'label':'manipulated','method':'classical_inpainting','mask':'../masks/img_006_inpainted_mask.png'}},
       'videos':{
-       'vid_001_pristine.mp4':{'label':'pristine'},'vid_002_duplicated_frames.mp4':{'label':'manipulated','method':'frame_duplication'},
-       'vid_003_deleted_segment.mp4':{'label':'manipulated','method':'segment_deletion_then_reencode'},'vid_004_overlay_edit.mp4':{'label':'manipulated','method':'overlay_then_reencode'}},
-      'note':'Controlled educational ground truth. It validates pipeline mechanics, not real-world error rates.'}
+       'vid_001_pristine.mp4':{'label':'pristine'},'vid_002_duplicated_frames.mp4':{'label':'manipulated','method':'frame_duplication','expected_duplicate_transitions':[36,37,38,39,40]},
+       'vid_003_deleted_segment.mp4':{'label':'manipulated','method':'segment_deletion_then_reencode','deleted_source_frames':[30,31,32,33,34,35,36,37,38,39]},'vid_004_overlay_edit.mp4':{'label':'manipulated','method':'overlay_then_reencode','overlay_frame_range':[25,49],'expected_abrupt_transitions':[25,50]}},
+      'note':'Controlled educational ground truth. It validates pipeline mechanics and regression behavior only, not real-world error rates or forensic validity.'}
     (OUT/'ground_truth.json').write_text(json.dumps(gt,indent=2,ensure_ascii=False),encoding='utf-8')
     print(OUT)
 if __name__=='__main__': main()

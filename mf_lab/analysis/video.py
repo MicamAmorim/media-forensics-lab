@@ -37,3 +37,34 @@ def frame_hash_duplicates(path: str | Path, mad_threshold: float = 0.05) -> dict
         if mad <= mad_threshold: dup.append(i)
     return {"frame_count":len(frames),"adjacent_near_duplicates":dup,"duplicate_count":len(dup),
             "mad_threshold":mad_threshold,"median_adjacent_mad":float(np.median(distances)) if distances else None}
+
+
+def frame_transition_anomalies(path: str | Path, absolute_threshold: float = 0.01, robust_sigma: float = 8.0) -> dict:
+    """Screen for abrupt frame-to-frame visual transitions."""
+    import cv2, numpy as np
+    cap = cv2.VideoCapture(str(path))
+    distances = []
+    previous = None
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (64, 64), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
+        if previous is not None:
+            distances.append(float(np.mean(np.abs(gray - previous))))
+        previous = gray
+    cap.release()
+    if not distances:
+        return {"frame_count": 0 if previous is None else 1, "transition_count": 0, "anomalous_transitions": [], "status": "screening_only"}
+    arr = np.asarray(distances, dtype=np.float64)
+    median = float(np.median(arr))
+    mad = float(np.median(np.abs(arr - median)))
+    robust_threshold = median + robust_sigma * 1.4826 * mad
+    threshold = max(float(absolute_threshold), float(robust_threshold))
+    anomalies = [{"index": int(i + 1), "mean_abs_difference": float(v)} for i, v in enumerate(arr) if v >= threshold]
+    return {
+        "frame_count": int(len(arr) + 1), "transition_count": int(len(arr)), "anomalous_transitions": anomalies,
+        "anomaly_count": len(anomalies), "median_transition_mad": median, "robust_mad": mad, "threshold": threshold,
+        "absolute_threshold": float(absolute_threshold), "robust_sigma": float(robust_sigma), "status": "screening_only",
+        "warning": "Abrupt-transition screening can detect cuts/overlays but cannot establish manipulation by itself and may miss edits followed by smooth re-encoding.",
+    }
