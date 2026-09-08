@@ -25,7 +25,8 @@ from mf_lab.analysis.deepfake import (
 )
 from mf_lab.analysis.image import copy_move_orb, ela, jpeg_dct_periodicity, noise_residual_stats
 from mf_lab.analysis.metadata import image_metadata, video_metadata
-from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies
+from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies, motion_discontinuity_screen
+from mf_lab.analysis.reference import reference_image_difference, reference_video_sequence_alignment
 from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
 from mf_lab.utils.io import sha256, write_json
@@ -56,6 +57,9 @@ METHODS = {
     "video_timing": {"refs": ["swgde_video_auth", "swgde_ffmpeg"]},
     "video_duplicates": {"refs": ["swgde_video_auth"], "screening_only": True},
     "video_transition_anomalies": {"refs": ["swgde_video_auth"], "screening_only": True},
+    "video_motion_discontinuities": {"refs": ["swgde_video_auth"], "screening_only": True},
+    "reference_image_difference": {"refs": ["swgde_image_auth"], "screening_only": True, "reference_assisted": True},
+    "reference_video_alignment": {"refs": ["swgde_video_auth"], "screening_only": True, "reference_assisted": True},
     "video_deepfake_protocol": {"refs": ["swgde_video_auth", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020"]},
     "veritas_upstream_crosscheck": {"refs": ["veritas_2025"], "screening_only": True, "secondary_implementation": True},
 }
@@ -71,7 +75,7 @@ def _environment() -> dict:
     return {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
-        "mflab_version": "0.3.0",
+        "mflab_version": "0.4.0",
         "veritas_integration": veritas_status(),
     }
 
@@ -89,6 +93,7 @@ def analyze_file(
     profile: str = "full",
     case_dir: str | Path | None = None,
     run_veritas: bool = False,
+    reference_path: str | Path | None = None,
 ) -> dict:
     if profile not in PROFILES:
         raise ValueError(f"unknown profile: {profile}; choose one of {', '.join(PROFILES)}")
@@ -101,7 +106,7 @@ def analyze_file(
     external_models = load_case_external_models(case_dir, path.name) if case_dir else []
 
     report = {
-        "schema_version": "0.2",
+        "schema_version": "0.4",
         "file": str(path),
         "sha256": sha256(path),
         "size_bytes": path.stat().st_size,
@@ -119,6 +124,9 @@ def analyze_file(
         _safe_method(m, "video_timing", frame_timing, path)
         _safe_method(m, "video_duplicates", frame_hash_duplicates, path)
         _safe_method(m, "video_transition_anomalies", frame_transition_anomalies, path)
+        _safe_method(m, "video_motion_discontinuities", motion_discontinuity_screen, path)
+        if reference_path is not None:
+            _safe_method(m, "reference_video_alignment", reference_video_sequence_alignment, path, reference_path)
         _safe_method(m, "video_deepfake_protocol", video_deepfake_protocol, path, external_models)
     elif is_image:
         _safe_method(m, "metadata", image_metadata, path)
@@ -145,7 +153,12 @@ def analyze_file(
             _safe_method(m, "copy_move_orb", copy_move_orb, path)
             _safe_method(m, "steganography_lsb", lsb_steganography_screen, path)
 
+        # The protocol reuses precomputed evidence families where possible.
+        if reference_path is not None:
+            _safe_method(m, "reference_image_difference", reference_image_difference, path, reference_path)
+
         precomputed = {
+            "c2pa": m.get("c2pa"),
             "noise_map": m.get("noise_map"),
             "resampling": m.get("resampling"),
             "prnu_screen": m.get("prnu_screen"),
@@ -155,6 +168,8 @@ def analyze_file(
         _safe_method(m, "deepfake_protocol", image_deepfake_protocol, path, precomputed, external_models)
 
         if run_veritas:
+            # Third-party code is never executed by default. This explicit mode
+            # allows reproducible cross-checking after the checkout is pinned.
             _safe_method(m, "veritas_upstream_crosscheck", run_veritas_all, path)
 
     report["method_registry"] = {k: METHODS[k] for k in m if k in METHODS}
@@ -163,25 +178,43 @@ def analyze_file(
 
 
 def analyze_case(case_dir: str | Path, profile: str = "full", run_veritas: bool = False) -> list[dict]:
+    import yaml
+
     case = Path(case_dir)
     original = case / "original"
     results = case / "results"
     results.mkdir(parents=True, exist_ok=True)
+    case_yaml = case / "case.yaml"
+    reference_files = {}
+    if case_yaml.exists():
+        try:
+            cfg = yaml.safe_load(case_yaml.read_text(encoding="utf-8")) or {}
+            reference_files = (cfg.get("case") or {}).get("reference_files") or {}
+        except Exception:
+            reference_files = {}
+
     reports = []
     for p in sorted(original.glob("*")):
         if not p.is_file():
             continue
+        ref_name = reference_files.get(p.name)
+        ref_path = original / ref_name if ref_name else None
+        if ref_path is not None and not ref_path.exists():
+            ref_path = None
         try:
-            reports.append(analyze_file(p, results, profile=profile, case_dir=case, run_veritas=run_veritas))
+            reports.append(analyze_file(
+                p, results, profile=profile, case_dir=case, run_veritas=run_veritas, reference_path=ref_path
+            ))
         except Exception as e:
             write_json(results / (p.name + ".error.json"), {"file": str(p), "error": repr(e)})
     write_json(
         case / "report.json",
         {
-            "schema_version": "0.2",
+            "schema_version": "0.4",
             "case_id": case.name,
             "profile": profile,
             "veritas_crosscheck_requested": bool(run_veritas),
+            "reference_files": reference_files,
             "reports": reports,
         },
     )

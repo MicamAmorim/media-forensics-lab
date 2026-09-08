@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 - 2026-09-08
+
+### Added
+- Two synthetic-media regression fixtures: controlled face replacement and a fully AI-generated natural-scene fixture; source fixtures are retained separately for deterministic rebuilds.
+- Reference-assisted image difference localization for splice/inpainting/face replacement when a trustworthy reference exists.
+- Reference-assisted video sequence alignment for deleted-segment detection.
+- Optical-flow motion-discontinuity screening.
+- Built-in non-cryptographic C2PA/JUMBF marker fallback when c2patool is absent.
+- Windows setup guide.
+
+### Changed
+- Deepfake protocol bumped to MFLAB-DF-0.4.
+- Face screening exposes controlled boundary/texture inconsistency flags without converting them into an evidentiary verdict.
+- Case demo records reference mappings in case.yaml and the pipeline applies reference-assisted methods automatically.
+- Unicode-safe image loading strengthened for Windows paths.
+
+### Validation
+- 31 automated tests pass in the internal Linux environment.
+- Demo validation: 16/16 required controlled checks pass, 0 failures.
+- Important limitation: several new successes are reference-assisted or provenance-based; they do not establish reference-free population-level deepfake accuracy.
+
 ## 0.3.0 - 2026-09-08
 
 ### Added
@@ -31,14 +52,3 @@
 - GitHub Actions CI for Python 3.10-3.12.
 - Upstream evaluation and third-party attribution notice.
 - Expanded preliminary report section for synthetic media/deepfake analysis.
-
-### Changed
-- Report generator now distinguishes screening findings from evidentiary conclusions.
-- PRNU is explicitly labelled as a screening residual, not source-camera attribution.
-- Tables in DOCX reports repeat headers and avoid splitting rows when possible.
-- Project version bumped to 0.2.0.
-
-### Validation
-- 12 automated tests pass on the bundled demo dataset.
-- Demo case re-analyzed with the full v0.2 profile.
-- Generated DOCX rendered to 18 pages and visually reviewed page-by-page.

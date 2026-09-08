@@ -10,7 +10,9 @@ import math
 from mf_lab.analysis.classical import resampling_analysis
 from mf_lab.analysis.deepfake import image_deepfake_protocol
 from mf_lab.analysis.image import copy_move_orb
-from mf_lab.analysis.video import frame_hash_duplicates, frame_transition_anomalies
+from mf_lab.analysis.video import frame_hash_duplicates, frame_transition_anomalies, motion_discontinuity_screen
+from mf_lab.analysis.reference import reference_image_difference, reference_video_sequence_alignment
+from mf_lab.analysis.c2pa import c2pa_inspect
 from mf_lab.validation import validate_demo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,5 +69,50 @@ def test_demo_validation_harness_passes_required_regressions(tmp_path):
     r = validate_demo(D, out)
     assert r["summary"]["failed"] == 0
     assert r["summary"]["ready_for_demo_regression"] is True
-    assert r["summary"]["unsupported"] == 3
+    assert r["summary"]["unsupported"] == 0
+    assert r["summary"]["required_checks"] >= 16
     assert out.exists()
+
+
+def _bbox_iou(a, b):
+    ax, ay, aw, ah = a; bx, by, bw, bh = b
+    x1=max(ax,bx); y1=max(ay,by); x2=min(ax+aw,bx+bw); y2=min(ay+ah,by+bh)
+    inter=max(0,x2-x1)*max(0,y2-y1)
+    union=aw*ah+bw*bh-inter
+    return inter/union if union else 0
+
+
+def test_splice_reference_localization():
+    gt=GT["images"]["img_003_splice.jpg"]
+    r=reference_image_difference(D/"images"/"img_003_splice.jpg", D/"images"/gt["reference"])
+    assert _bbox_iou(r["largest_component_bbox_xywh"], gt["expected_bbox_xywh"]) >= 0.75
+
+
+def test_inpainting_reference_localization():
+    gt=GT["images"]["img_006_inpainted.jpg"]
+    r=reference_image_difference(D/"images"/"img_006_inpainted.jpg", D/"images"/gt["reference"])
+    assert _bbox_iou(r["largest_component_bbox_xywh"], gt["expected_bbox_xywh"]) >= 0.45
+
+
+def test_face_replacement_reference_localization():
+    gt=GT["images"]["img_007_deepfake_face.jpg"]
+    r=reference_image_difference(D/"images"/"img_007_deepfake_face.jpg", D/"images"/gt["reference"])
+    assert _bbox_iou(r["largest_component_bbox_xywh"], gt["face_bbox_xywh"]) >= 0.50
+
+
+def test_ai_generated_native_synthetic_texture_screen():
+    from mf_lab.analysis.deepfake import image_deepfake_protocol
+    r=image_deepfake_protocol(D/"images"/"img_008_ai_generated.png")
+    assert any(x.get("family") == "synthetic_texture" for x in r.get("screening_observations", []))
+
+
+def test_segment_deletion_motion_discontinuity():
+    gt=GT["videos"]["vid_003_deleted_segment.mp4"]
+    r=motion_discontinuity_screen(D/"videos"/"vid_003_deleted_segment.mp4")
+    assert gt["expected_questioned_transition_index"] in [x["index"] for x in r["anomalies"]]
+
+
+def test_segment_deletion_reference_alignment():
+    gt=GT["videos"]["vid_003_deleted_segment.mp4"]
+    r=reference_video_sequence_alignment(D/"videos"/"vid_003_deleted_segment.mp4", D/"videos"/gt["reference"])
+    assert any(x["skipped_reference_count"] == 10 and [x["previous_reference_index"],x["next_reference_index"]] == gt["expected_reference_jump"] for x in r["skipped_segments"])

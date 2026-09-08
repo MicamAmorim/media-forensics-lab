@@ -58,13 +58,13 @@ def test_duplicate_frames_screening_runs():
 
 def test_image_deepfake_protocol_never_auto_verdicts():
     r = image_deepfake_protocol(D / "images" / "img_001_pristine.jpg")
-    assert r["protocol_version"] == "MFLAB-DF-0.3"
+    assert r["protocol_version"] == "MFLAB-DF-0.4"
     assert r["evidentiary_conclusion"] == "inconclusive"
 
 
 def test_video_deepfake_protocol_never_auto_verdicts():
     r = video_deepfake_protocol(D / "videos" / "vid_001_pristine.mp4")
-    assert r["protocol_version"] == "MFLAB-DF-0.3"
+    assert r["protocol_version"] == "MFLAB-DF-0.4"
     assert r["evidentiary_conclusion"] == "inconclusive"
 
 
@@ -90,7 +90,6 @@ def test_full_pipeline_writes_deepfake_protocol(tmp_path):
 def test_opencv_reads_non_ascii_path(tmp_path):
     """Regression for Windows evidence paths such as 'Perícia Digital'."""
     from shutil import copy2
-
     accented = tmp_path / "Perícia Digital"
     accented.mkdir()
     src = D / "images" / "img_001_pristine.jpg"
@@ -105,8 +104,28 @@ def test_windows_haar_cascade_recovers_from_mojibake_path():
     import os
     if os.name != "nt":
         return
-
     import cv2
     bogus = r"Z:\Per├¡cia Digital\cv2\data\haarcascade_frontalface_default.xml"
     cascade = cv2.CascadeClassifier(bogus)
     assert not cascade.empty()
+
+
+def test_ai_generated_fixture_triggers_synthetic_texture_screen():
+    r = image_deepfake_protocol(D / "images" / "img_008_ai_generated.png")
+    assert any(x.get("family") == "synthetic_texture" for x in r.get("screening_observations", []))
+
+
+def test_builtin_c2pa_marker_scanner_is_non_cryptographic(tmp_path):
+    from mf_lab.analysis.c2pa import c2pa_inspect
+    p = tmp_path / "marker.bin"
+    p.write_bytes(b"test-jumb-marker-c2pa-openai")
+    r = c2pa_inspect(p)
+    if r.get("tool") == "builtin_marker_scan":
+        assert r["embedded_c2pa_marker_present"] is True
+        assert r["cryptographically_validated"] is False
+
+
+def test_face_replacement_fixture_triggers_face_screening_flag():
+    from mf_lab.analysis.deepfake import face_artifact_screen
+    r = face_artifact_screen(D / "images" / "img_007_deepfake_face.jpg")
+    assert "face_boundary_texture_discontinuity" in r.get("screening_flags", [])

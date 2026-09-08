@@ -18,3 +18,4 @@ case:
     - "Os metadados e a estrutura do arquivo são compatíveis com a narrativa de origem apresentada?"
     - "Há elementos suficientes para afirmar ou excluir geração sintética/IA?"
   observations: ""
+  reference_files: {}
