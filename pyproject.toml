@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "media-forensics-lab"
 version = "0.2.0"
@@ -5,7 +9,7 @@ description = "Reproducible media-forensics laboratory for image/video authentic
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",
-  "opencv-python>=4.8",
+  "opencv-python>=4.8,<5",
   "Pillow>=10",
   "scipy>=1.10",
   "scikit-image>=0.21",
@@ -21,6 +25,10 @@ ai = ["datasets>=3", "huggingface_hub>=0.25"]
 
 [project.scripts]
 mflab = "mf_lab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mf_lab*"]
+exclude = ["dataset*", "templates*", "third_party*", "bibliography*", "tests*", "case-*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

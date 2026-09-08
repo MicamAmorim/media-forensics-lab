@@ -84,3 +84,16 @@ def test_full_pipeline_writes_deepfake_protocol(tmp_path):
     assert "c2pa" in r["methods"]
     assert "deepfake_protocol" in r["methods"]
     assert r["methods"]["deepfake_protocol"]["evidentiary_conclusion"] == "inconclusive"
+
+
+def test_opencv_reads_non_ascii_path(tmp_path):
+    """Regression for Windows evidence paths such as 'Perícia Digital'."""
+    from shutil import copy2
+
+    accented = tmp_path / "Perícia Digital"
+    accented.mkdir()
+    src = D / "images" / "img_001_pristine.jpg"
+    dst = accented / "evidência_001.jpg"
+    copy2(src, dst)
+    r = histogram_analysis(dst)
+    assert set(r["channels"]) == {"R", "G", "B"}
