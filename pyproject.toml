@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "media-forensics-lab"
-version = "0.3.0"
+version = "0.4.0"
 description = "Reproducible media-forensics laboratory for image/video authenticity, manipulation and synthetic-media triage with preliminary reporting."
 requires-python = ">=3.10"
 dependencies = [

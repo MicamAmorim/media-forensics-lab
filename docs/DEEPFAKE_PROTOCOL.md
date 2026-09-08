@@ -1,4 +1,4 @@
-# MFLab Deepfake / Synthetic Media Protocol — MFLAB-DF-0.3
+# MFLab Deepfake / Synthetic Media Protocol — MFLAB-DF-0.4
 
 The protocol deliberately avoids a single "AI probability". A forensic conclusion should be based on provenance, file/encoding history, classical image/video forensics, validated learned detectors, and human review.
 
@@ -36,7 +36,7 @@ The protocol deliberately avoids a single "AI probability". A forensic conclusio
 - Sampled frequency consistency.
 - Temporal structure and duplicate/gap analysis.
 
-These native modules are **screening only**. In v0.3 their outputs are stored as `screening_observations`; because they are not calibrated to a target population/domain, they do **not** by themselves trigger `needs_expert_review` as deepfake evidence and do not produce an evidentiary AI probability.
+These native modules are **screening only**. In v0.4 their outputs are stored as `screening_observations`; because they are not calibrated to a target population/domain, they do **not** by themselves trigger `needs_expert_review` as deepfake evidence and do not produce an evidentiary AI probability.
 
 ## Stage 4 — Validated learned detectors
 
@@ -100,3 +100,10 @@ mflab validate-demo --out validation/demo_validation.json
 ```
 
 The bundled demo ground truth checks known injected transformations (for example copy-move translation and duplicated-frame positions) and verifies that the pristine fixture is not falsely escalated by the deepfake protocol. This is a **regression harness**, not a measurement of real-world sensitivity, specificity, false-positive rate or admissibility. Unsupported capabilities are reported explicitly rather than counted as successful detections.
+
+
+## v0.4 controlled synthetic fixtures
+
+The bundled regression set now contains a controlled face-replacement fixture and a fully AI-generated natural-scene fixture. The face fixture is created by blending an AI-generated donor face into the face region of the pristine source; it is **not** presented as a representative DeepFaceLab/FaceSwap benchmark sample. The full-AI fixture is used to exercise an uncalibrated signal-based synthetic-texture screen. Both source fixtures are retained under `dataset/fixtures/` for deterministic engineering regression.
+
+Reference-assisted image comparison and video sequence alignment are separate capabilities: they are strong when a trustworthy corresponding reference exists, but they do not solve reference-free authentication. The native face-boundary and optical-flow rules remain uncalibrated screening heuristics.

@@ -1,20 +1,22 @@
-# Media Forensics Lab (Python) - v0.3
+# Media Forensics Lab (Python) - v0.4
 
 Laboratório educacional/de pesquisa para **análise reproduzível de autenticidade, manipulação e mídia sintética (IA/deepfake)** em imagens e vídeos, com geração de **laudo técnico preliminar** e rastreabilidade método → referência bibliográfica.
 
 > **Regra central:** o laboratório não transforma um escore isolado em conclusão pericial. ELA, histogramas, ruído, FFT, PRNU simplificado, detectores de IA e outros sinais são interpretados em conjunto com proveniência, estrutura, contexto e cadeia de custódia.
 
-## O que mudou na v0.3
+## O que mudou na v0.4
 
-- protocolo `MFLAB-DF-0.3`: heurísticas nativas não calibradas passam a ser **observações de triagem**, sem elevar por si só o caso a evidência de deepfake;
-- correção do copy-move ORB: auto-matching deixa de ser bloqueado por identidade e passa a usar vizinhos não-idênticos + agrupamento geométrico por translação;
-- detector de transições visuais abruptas em vídeo para triagem de overlays/cortes;
-- resampling passa a expor persistência de autocorrelação de curto lag em vez de tratar correlação de lag 1 como discriminativa;
-- `mflab validate-demo`: harness de validação regressiva contra o `ground_truth.json` controlado;
-- ground truth enriquecido com translação conhecida do copy-move, índices exatos de frames duplicados e fronteiras do overlay;
-- testes passam a verificar **detecção conhecida**, e não apenas se a função executou;
-- lacunas atuais são registradas explicitamente como `unsupported` em vez de serem escondidas: localização de splice, inpainting e deleção de segmento após re-encode;
-- permanecem as integrações opcionais com C2PA, DeepfakeBench e CodeRafay/Veritas.
+- protocolo `MFLAB-DF-0.4`;
+- duas novas fixtures sintéticas: `img_007_deepfake_face.jpg` (substituição facial controlada usando doador gerado por IA) e `img_008_ai_generated.png` (cena integralmente gerada por IA; a fixture fonte é preservada em `dataset/fixtures` para regressão determinística);
+- triagem facial registra descontinuidade de textura/borda na fixture de substituição facial, sem convertê-la em probabilidade de deepfake;
+- `c2pa_inspect` possui fallback de leitura de marcadores C2PA/JUMBF quando `c2patool` não está instalado; esse fallback **não** valida assinatura criptográfica;
+- triagem sintética combina relação de alta/baixa frequência com residual tipo PRNU em limiar de engenharia testado apenas na fixture AI empacotada;
+- comparação assistida com imagem de referência para localizar regiões alteradas; na base demo ela localiza splice, inpainting e substituição facial;
+- alinhamento temporal assistido com vídeo de referência para localizar segmento removido após re-encode;
+- triagem cega de descontinuidade de movimento por fluxo óptico para saltos temporais/conteúdo;
+- `mflab validate-demo` executa 16 checks controlados;
+- leitura de imagens via OpenCV reforçada para caminhos Unicode no Windows;
+- limitações explícitas: os novos checks de splice/inpainting/face replacement são, em parte, **reference-assisted** e não equivalem a detectores cegos validados em população real.
 
 ## Funcionalidades
 
@@ -22,7 +24,7 @@ Laboratório educacional/de pesquisa para **análise reproduzível de autenticid
 |---|---:|---:|---|
 | SHA-256 / integridade | ✅ | ✅ | preservação |
 | Hash perceptual | ✅ | ✅ | similaridade/proveniência auxiliar |
-| C2PA / Content Credentials | ✅ | — | proveniência criptográfica |
+| C2PA / Content Credentials | ✅ (marcador nativo; validação criptográfica com c2patool) | — | proveniência |
 | EXIF / metadados | ✅ | ✅ | estrutura/origem auxiliar |
 | ELA | ✅ | ✅ | triagem |
 | Histograma RGB | ✅ | ✅ | triagem |
@@ -39,6 +41,8 @@ Laboratório educacional/de pesquisa para **análise reproduzível de autenticid
 | Deepfake aprendido | por resultados externos | DeepfakeBench | camada validada separada |
 | Vídeo: timestamps/frames | ✅ | upstream é focado em imagem | análise temporal |
 | Vídeo: transições abruptas | ✅ | — | triagem de overlay/corte |
+| Vídeo: fluxo óptico | ✅ | — | triagem de descontinuidade de conteúdo |
+| Comparação com referência | ✅ | — | localização assistida de alterações / alinhamento temporal |
 | Harness de validação demo | ✅ | — | regressão controlada contra ground truth |
 | Laudo DOCX/Markdown | ✅ | — | consolidação |
 
@@ -60,6 +64,7 @@ media-forensics-lab/
 │   └── download_bibliography.py
 ├── tests/
 ├── dataset/demo/
+├── dataset/fixtures/         # fontes controladas para reconstruir fixtures sintéticas
 ├── bibliography/
 ├── third_party/
 └── case-2026-001/
@@ -82,9 +87,11 @@ pip install -e . --no-deps --no-build-isolation
 
 Dependências de sistema recomendadas:
 
-- `ffmpeg` / `ffprobe`;
-- `exiftool`;
-- `c2patool` para C2PA/Content Credentials.
+- `ffmpeg` / `ffprobe` — necessário para a análise completa de vídeo;
+- `exiftool` — recomendado para metadados avançados;
+- `c2patool` — recomendado para validação criptográfica de C2PA/Content Credentials. Sem ele, o MFLab apenas detecta a presença de marcadores embutidos.
+
+Veja `docs/WINDOWS_SETUP.md` para a instalação completa no Windows.
 
 ## Dataset e testes
 
@@ -94,18 +101,9 @@ pytest -q
 mflab validate-demo --out validation/demo_validation.json
 ```
 
-`pytest` responde principalmente se as rotinas e regressões codificadas estão funcionando. `mflab validate-demo` confronta as saídas do pipeline com o `dataset/demo/ground_truth.json` e informa separadamente checks aprovados, falhos e capacidades ainda não implementadas.
+`pytest` responde principalmente se as rotinas e regressões codificadas estão funcionando. `mflab validate-demo` confronta as saídas com o `dataset/demo/ground_truth.json`. Na v0.4 são 16 verificações controladas, incluindo as duas novas fixtures sintéticas.
 
-O ground truth registra adulterações controladas: copy-move, splice, double JPEG, resampling, inpainting, duplicação de frames, remoção de segmento e overlay. **Essa base pequena não estima sensibilidade, especificidade, FPR/FNR ou validade pericial real.** Ela serve para regressão de engenharia e coerência com manipulações conhecidas.
-
-Para um pequeno conjunto externo AI-vs-real, em ambiente com Internet:
-
-```bash
-pip install -e .[ai]
-python scripts/download_ai_samples.py --n-per-class 12
-```
-
-Datasets externos e pesos não são versionados no Git.
+O ground truth registra pristine, copy-move, splice, double JPEG, resampling, inpainting, substituição facial sintética, imagem integralmente gerada por IA, duplicação de frames, remoção de segmento e overlay. Alguns checks usam uma referência conhecida (`reference-assisted`). **Essa base pequena não estima sensibilidade, especificidade, FPR/FNR ou validade pericial real.** Ela serve para regressão de engenharia e coerência com transformações conhecidas.
 
 ## Perfis de análise
 
@@ -116,7 +114,7 @@ mflab analyze-file imagem.jpg --profile full
 ```
 
 - `quick`: preservação + proveniência + triagem compacta;
-- `deepfake`: todas as famílias relevantes ao protocolo de mídia sintética;
+- `deepfake`: famílias relevantes ao protocolo de mídia sintética;
 - `full`: protocolo completo + copy-move + esteganálise e demais métodos nativos.
 
 ## Caso completo
@@ -133,115 +131,19 @@ Cada arquivo gera `*.report.json`, depois consolidado em `case/report.json`. O l
 
 Leia `docs/DEEPFAKE_PROTOCOL.md`.
 
-O pipeline segue, em alto nível:
-
-```text
-preservação/hash
-      ↓
-C2PA + metadados + estrutura
-      ↓
-compressão / ruído / frequência / resampling / PRNU-residual
-      ↓
-face/temporal screening
-      ↓
-modelos aprendidos validados (quando configurados)
-      ↓
-convergência + revisão humana
-      ↓
-conclusão documentada
-```
-
-O resultado automático nativo mantém `evidentiary_conclusion: inconclusive`. Heurísticas não calibradas podem aparecer em `screening_observations`, mas não acionam sozinhas `needs_expert_review`. Isso é intencional: o raciocínio pericial final pertence ao examinador e precisa considerar validação do método e o contexto do caso.
-
-### Importar resultados de modelos aprendidos
-
-Crie:
-
-```text
-case-2026-001/external/deepfake_scores.json
-```
-
-Exemplo:
-
-```json
-{
-  "files": {
-    "questioned.mp4": [
-      {
-        "model": "FTCN",
-        "score": 0.82,
-        "label": "fake",
-        "validated": true,
-        "validation": "protocolo cross-dataset documentado no anexo",
-        "checkpoint": "sha256:..."
-      }
-    ]
-  }
-}
-```
-
-`validated: true` deve ser colocado pelo examinador **somente após documentar a validação aplicável ao caso**.
+O resultado automático nativo mantém `evidentiary_conclusion: inconclusive`. Heurísticas não calibradas e marcadores C2PA não validados criptograficamente aparecem como `screening_observations`; não são convertidos automaticamente em veredito de deepfake/IA.
 
 ## DeepfakeBench
 
-O projeto não copia o DeepfakeBench para dentro do código principal. Em vez disso, mantém uma integração desacoplada, pois o framework possui ambiente, pesos, datasets e condições de licença próprios.
+O projeto mantém integração desacoplada. Execute detectores no ambiente do DeepfakeBench, exporte os escores e importe-os em `external/deepfake_scores.json`; só marque `validated: true` após documentar validação aplicável ao domínio/caso.
 
-```bash
-python scripts/fetch_external_tools.py deepfakebench
-mflab integrations
-```
+## Bibliografia e laudo
 
-Execute os detectores no ambiente do DeepfakeBench, exporte os escores e importe-os no arquivo `external/deepfake_scores.json`. Isso mantém a versão/checkpoint do modelo separada das heurísticas nativas.
-
-## CodeRafay / Veritas
-
-A revisão do repositório está em `docs/UPSTREAM_EVALUATION.md`.
-
-A licença upstream é BSD 3-Clause. Por padrão o MFLab **não copia nem executa** código de terceiros. Para instalar o checkout:
-
-```bash
-python scripts/fetch_external_tools.py veritas
-mflab integrations
-```
-
-Para executar todos os módulos upstream como **cross-check secundário**:
-
-```bash
-mflab analyze-case case-2026-001 --profile full --veritas
-```
-
-Os resultados ficam separados em `veritas_upstream_crosscheck`; nunca são fundidos silenciosamente em um “authenticity score”. O `third_party/CodeRafay-Veritas-NOTICE.md` preserva a atribuição/licença.
-
-## Bibliografia
-
-`bibliography/references.yaml` associa cada método às fontes pertinentes. O laudo importa automaticamente apenas as referências dos métodos executados, além da base legal/metodológica.
-
-```bash
-python scripts/download_bibliography.py
-```
-
-O script não contorna paywalls. Livros comerciais são apenas referenciados e **não** redistribuídos.
-
-## Base do laudo
-
-O gerador foi estruturado com:
-
-- identificação/objeto;
-- material recebido e SHA-256;
-- cadeia de custódia/preservação;
-- metodologia;
-- resultados;
-- protocolo de mídia sintética/deepfake;
-- conclusão preliminar;
-- respostas aos quesitos;
-- limitações;
-- referências.
-
-Ele usa como base jurídica o art. 473 do CPC e os arts. 158-A a 158-F do CPP, sem substituir a avaliação jurídica do caso concreto.
+`bibliography/references.yaml` associa métodos às fontes. O gerador do laudo estrutura identificação/objeto, material recebido, cadeia de custódia, metodologia, resultados, mídia sintética/deepfake, conclusão preliminar, quesitos, limitações e referências. Ele usa como base jurídica o art. 473 do CPC e os arts. 158-A a 158-F do CPP, sem substituir avaliação jurídica do caso concreto.
 
 ## Observação sobre PRNU
 
-Nesta versão, `prnu_screen` produz somente um residual de triagem. **Não chame isso de identificação de câmera.** Uma implementação pericial de source-camera identification deve usar vários exemplares conhecidos, extração/normalização apropriada do fingerprint e estatística calibrada (por exemplo PCE), com validação documentada.
+Nesta versão, `prnu_screen` produz somente residual de triagem. **Não chame isso de identificação de câmera.** Source-camera identification requer vários exemplares conhecidos, extração/normalização apropriada do fingerprint e estatística calibrada (por exemplo PCE), com validação documentada.
 
 ## Desenvolvimento
 
@@ -250,4 +152,4 @@ pytest -q
 mflab integrations
 ```
 
-O CI em `.github/workflows/ci.yml` testa Python 3.10, 3.11 e 3.12.
+O CI em `.github/workflows/ci.yml` testa Python 3.10, 3.11 e 3.12 em Windows e Ubuntu.

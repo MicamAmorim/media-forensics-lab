@@ -40,8 +40,15 @@ def frame_hash_duplicates(path: str | Path, mad_threshold: float = 0.05) -> dict
 
 
 def frame_transition_anomalies(path: str | Path, absolute_threshold: float = 0.01, robust_sigma: float = 8.0) -> dict:
-    """Screen for abrupt frame-to-frame visual transitions."""
+    """Screen for abrupt frame-to-frame visual transitions.
+
+    Frames are reduced to 64x64 grayscale and normalized to [0, 1].  A
+    transition is flagged only when it exceeds both an absolute MAD threshold
+    and a robust median/MAD-derived threshold. This is useful for abrupt
+    overlays/cuts but is not a detector of every kind of video edit.
+    """
     import cv2, numpy as np
+
     cap = cv2.VideoCapture(str(path))
     distances = []
     previous = None
@@ -49,22 +56,92 @@ def frame_transition_anomalies(path: str | Path, absolute_threshold: float = 0.0
         ok, frame = cap.read()
         if not ok:
             break
-        gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (64, 64), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
+        gray = cv2.resize(
+            cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
+            (64, 64),
+            interpolation=cv2.INTER_AREA,
+        ).astype(np.float32) / 255.0
         if previous is not None:
             distances.append(float(np.mean(np.abs(gray - previous))))
         previous = gray
     cap.release()
+
     if not distances:
-        return {"frame_count": 0 if previous is None else 1, "transition_count": 0, "anomalous_transitions": [], "status": "screening_only"}
+        return {
+            "frame_count": 0 if previous is None else 1,
+            "transition_count": 0,
+            "anomalous_transitions": [],
+            "status": "screening_only",
+        }
+
     arr = np.asarray(distances, dtype=np.float64)
     median = float(np.median(arr))
     mad = float(np.median(np.abs(arr - median)))
     robust_threshold = median + robust_sigma * 1.4826 * mad
     threshold = max(float(absolute_threshold), float(robust_threshold))
-    anomalies = [{"index": int(i + 1), "mean_abs_difference": float(v)} for i, v in enumerate(arr) if v >= threshold]
+    anomalies = [
+        {"index": int(i + 1), "mean_abs_difference": float(v)}
+        for i, v in enumerate(arr)
+        if v >= threshold
+    ]
     return {
-        "frame_count": int(len(arr) + 1), "transition_count": int(len(arr)), "anomalous_transitions": anomalies,
-        "anomaly_count": len(anomalies), "median_transition_mad": median, "robust_mad": mad, "threshold": threshold,
-        "absolute_threshold": float(absolute_threshold), "robust_sigma": float(robust_sigma), "status": "screening_only",
+        "frame_count": int(len(arr) + 1),
+        "transition_count": int(len(arr)),
+        "anomalous_transitions": anomalies,
+        "anomaly_count": len(anomalies),
+        "median_transition_mad": median,
+        "robust_mad": mad,
+        "threshold": threshold,
+        "absolute_threshold": float(absolute_threshold),
+        "robust_sigma": float(robust_sigma),
+        "status": "screening_only",
         "warning": "Abrupt-transition screening can detect cuts/overlays but cannot establish manipulation by itself and may miss edits followed by smooth re-encoding.",
+    }
+
+
+def motion_discontinuity_screen(path: str | Path, robust_z_threshold: float = 2.0) -> dict:
+    """Optical-flow discontinuity screening for abrupt content jumps.
+
+    This can flag a cut/skip even when timestamps were repaired by re-encoding.
+    It remains a screening heuristic: fast camera motion, flashes and hard cuts
+    can produce similar outliers.
+    """
+    import cv2, numpy as np
+
+    cap = cv2.VideoCapture(str(path))
+    prev = None
+    means = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (128, 128), interpolation=cv2.INTER_AREA)
+        if prev is not None:
+            flow = cv2.calcOpticalFlowFarneback(prev, gray, None, 0.5, 3, 21, 3, 5, 1.2, 0)
+            mag = np.linalg.norm(flow, axis=2)
+            means.append(float(np.mean(mag)))
+        prev = gray
+    cap.release()
+
+    if not means:
+        return {"status": "screening_only", "frame_count": 0 if prev is None else 1, "anomaly_count": 0, "anomalies": []}
+    arr = np.asarray(means, dtype=np.float64)
+    median = float(np.median(arr))
+    mad = float(np.median(np.abs(arr - median)))
+    scale = 1.4826 * mad + 1e-12
+    z = (arr - median) / scale
+    anomalies = [
+        {"index": int(i + 1), "mean_flow": float(arr[i]), "robust_z": float(z[i])}
+        for i in range(len(arr)) if z[i] >= robust_z_threshold
+    ]
+    return {
+        "status": "screening_only",
+        "frame_count": int(len(arr) + 1),
+        "transition_count": int(len(arr)),
+        "median_mean_flow": median,
+        "robust_mad": mad,
+        "robust_z_threshold": float(robust_z_threshold),
+        "anomalies": anomalies,
+        "anomaly_count": len(anomalies),
+        "warning": "Optical-flow discontinuities are non-specific. Fast motion, hard cuts and lighting changes may also trigger them; confirm with sequence/context review or a reference video when available.",
     }
