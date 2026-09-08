@@ -7,7 +7,7 @@ PowerShell:
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip --trusted-host pypi.org --trusted-host files.pythonhosted.org
+python -m pip install --upgrade pip setuptools wheel --trusted-host pypi.org --trusted-host files.pythonhosted.org
 pip install -r requirements.txt --trusted-host pypi.org --trusted-host files.pythonhosted.org
 pip install -e . --no-deps --no-build-isolation
 python scripts/build_demo_dataset.py
@@ -16,13 +16,24 @@ pytest -q
 
 The two-step installation is intentional. In networks that replace HTTPS
 certificates, PEP 517 build isolation may try to create a temporary environment
-and download `setuptools`, causing `CERTIFICATE_VERIFY_FAILED`. Installing the
-runtime requirements first and then using `--no-build-isolation --no-deps`
-avoids a second dependency-resolution/download step.
+and download `setuptools`/`wheel`, causing `CERTIFICATE_VERIFY_FAILED`.
+Installing the build tools and runtime requirements first and then using
+`--no-build-isolation --no-deps` avoids a second isolated download step.
 
 `--trusted-host` is a workaround for networks with TLS inspection/self-signed
 proxy certificates. Prefer installing the organization's CA certificate into
 Python/pip's trust store when possible.
+
+## Editable-install package discovery
+
+MFLab uses a flat repository layout that also contains `dataset`, `templates`,
+`third_party` and `bibliography`. These are not Python packages. The
+`pyproject.toml` therefore explicitly restricts setuptools discovery to
+`mf_lab*`, preventing setuptools from aborting with:
+
+```text
+Multiple top-level packages discovered in a flat-layout
+```
 
 ## OpenCV version
 
