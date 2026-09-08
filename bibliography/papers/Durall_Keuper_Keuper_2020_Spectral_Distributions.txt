@@ -1,0 +1,3 @@
+DURALL, R.; KEUPER, M.; KEUPER, J. Watch Your Up-Convolution: CNN Based Generative Deep Neural Networks Are Failing to Reproduce Spectral Distributions. CVPR, 2020.
+
+Fonte: https://openaccess.thecvf.com/content_CVPR_2020/html/Durall_Watch_Your_Up-Convolution_CNN_Based_Generative_Deep_Neural_Networks_Are_Failing_CVPR_2020_paper.html

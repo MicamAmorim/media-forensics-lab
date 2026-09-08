@@ -1,0 +1,3 @@
+POPESCU, A. C.; FARID, H. Exposing Digital Forgeries by Detecting Traces of Resampling. IEEE Transactions on Signal Processing, v. 53, n. 2, p. 758-767, 2005.
+
+Fonte: https://farid.berkeley.edu/downloads/publications/tsp05.pdf

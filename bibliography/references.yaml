@@ -1,0 +1,133 @@
+references:
+  cpp_art473:
+    type: law
+    citation: BRASIL. Lei nº 13.105, de 16 de março de 2015. Código de Processo Civil,
+      art. 473. Texto atualizado. Câmara dos Deputados.
+    file: laws/Codigo_de_Processo_Civil_atualizado.pdf
+    url: https://www2.camara.leg.br/legin/fed/lei/2015/lei-13105-16-marco-2015-780273-normaatualizada-pl.pdf
+  cpp_chain_custody:
+    type: law
+    citation: BRASIL. Decreto-Lei nº 3.689, de 3 de outubro de 1941. Código de Processo
+      Penal, arts. 158-A a 158-F. Texto atualizado. Câmara dos Deputados.
+    file: laws/Codigo_de_Processo_Penal_atualizado.pdf
+    url: https://www2.camara.leg.br/legin/fed/declei/1940-1949/decreto-lei-3689-3-outubro-1941-322206-normaatualizada-pe.pdf
+  swgde_image_auth:
+    type: guideline
+    citation: SWGDE. Best Practices for Image Authentication. 18-I-001-2.0, version
+      2.0, 2025.
+    file: guidelines/SWGDE_Best_Practices_Image_Authentication.pdf
+    url: https://www.swgde.org/documents/published-complete-listing/18-i-001-best-practices-for-image-authentication/
+  swgde_video_auth:
+    type: guideline
+    citation: SWGDE. Best Practices for Digital Video Authentication. 23-V-001-1.2,
+      2024.
+    file: guidelines/SWGDE_Best_Practices_Digital_Video_Authentication.pdf
+    url: https://www.swgde.org/wp-content/uploads/2024/03/2024-03-07-SWGDE-Best-Practices-for-Digital-Video-Authentication-23-V-001-1.2.pdf
+  swgde_integrity:
+    type: guideline
+    citation: SWGDE. Best Practices for Maintaining the Integrity of Imagery. 17-I-001-1.1.
+    file: guidelines/README_integrity.txt
+    url: https://www.swgde.org/documents/published-complete-listing/17-i-001-best-practices-for-maintaining-the-integrity-of-imagery/
+  swgde_ffmpeg:
+    type: guideline
+    citation: SWGDE. Technical Notes on FFmpeg for Forensic Video Examinations. 16-V-002-3.0,
+      2024.
+    file: guidelines/README_ffmpeg.txt
+    url: https://www.swgde.org/documents/published-by-committee/video/
+  lukas_fridrich_2003:
+    type: paper
+    citation: LUKÁŠ, J.; FRIDRICH, J. Estimation of Primary Quantization Matrix in
+      Double Compressed JPEG Images. DFRWS, 2003.
+    file: papers/Lukas_Fridrich_2003_Double_Compression.pdf
+    url: https://ws.binghamton.edu/fridrich/Research/Doublecompression.pdf
+  fridrich_soukal_lukas_2003:
+    type: paper
+    citation: FRIDRICH, J.; SOUKAL, D.; LUKÁŠ, J. Detection of Copy-Move Forgery in
+      Digital Images. DFRWS, 2003.
+    file: papers/README_copy_move.txt
+    url: https://ws.binghamton.edu/fridrich/publications.html
+  lukas_fridrich_goljan_2005:
+    type: paper
+    citation: LUKÁŠ, J.; FRIDRICH, J.; GOLJAN, M. Determining Digital Image Origin
+      Using Sensor Imperfections. Proc. SPIE, 2005.
+    file: papers/Lukas_Fridrich_Goljan_2005_Sensor_Imperfections.pdf
+    url: https://ws.binghamton.edu/fridrich/Research/EI5685-29_Forensic.pdf
+  video_noiseprint_2019:
+    type: paper
+    citation: COZZOLINO, D.; POGGI, G.; VERDOLIVA, L. Extracting Camera-Based Fingerprints
+      for Video Forensics. CVPR Workshops, 2019.
+    file: papers/Cozzolino_Poggi_Verdoliva_2019_Video_Noiseprint.pdf
+    url: https://openaccess.thecvf.com/content_CVPRW_2019/papers/Media%20Forensics/Verdoliva_Extracting_camera-based_fingerprints_for_video_forensics_CVPRW_2019_paper.pdf
+  faceforensics_2019:
+    type: paper
+    citation: 'RÖSSLER, A. et al. FaceForensics++: Learning to Detect Manipulated
+      Facial Images. ICCV, 2019.'
+    file: papers/Rossler_et_al_2019_FaceForensicsPP.pdf
+    url: https://openaccess.thecvf.com/content_ICCV_2019/papers/Rossler_FaceForensics_Learning_to_Detect_Manipulated_Facial_Images_ICCV_2019_paper.pdf
+  celebdf_2020:
+    type: paper
+    citation: 'LI, Y. et al. Celeb-DF: A Large-Scale Challenging Dataset for DeepFake
+      Forensics. CVPR, 2020.'
+    file: papers/Li_et_al_2020_CelebDF.pdf
+    url: https://openaccess.thecvf.com/content_CVPR_2020/papers/Li_Celeb-DF_A_Large-Scale_Challenging_Dataset_for_DeepFake_Forensics_CVPR_2020_paper.pdf
+  trufor_2023:
+    type: paper
+    citation: 'GUILLARO, F. et al. TruFor: Leveraging All-Round Clues for Trustworthy
+      Image Forgery Detection and Localization. CVPR, 2023.'
+    file: papers/Guillaro_et_al_2023_TruFor.pdf
+    url: https://openaccess.thecvf.com/content/CVPR2023/papers/Guillaro_TruFor_Leveraging_All-Round_Clues_for_Trustworthy_Image_Forgery_Detection_and_CVPR_2023_paper.pdf
+  deepfakebench_2023:
+    type: paper
+    citation: 'YAN, Z. et al. DeepfakeBench: A Comprehensive Benchmark of Deepfake
+      Detection. NeurIPS Datasets and Benchmarks, 2023.'
+    file: papers/Yan_et_al_2023_DeepfakeBench.pdf
+    url: https://proceedings.neurips.cc/paper_files/paper/2023/file/0e735e4b4f07de483cbe250130992726-Paper-Datasets_and_Benchmarks.pdf
+  cifake_2023:
+    type: paper
+    citation: 'BIRD, J. J.; LOTFI, A. CIFAKE: Image Classification and Explainable
+      Identification of AI-Generated Synthetic Images. 2023.'
+    file: papers/README_CIFAKE.txt
+    url: https://arxiv.org/abs/2303.14126
+  farid_photo_forensics:
+    type: book
+    citation: FARID, H. Photo Forensics. MIT Press, 2016.
+    file: books/README_Photo_Forensics_Farid.txt
+    url: https://mitpress.mit.edu/9780262532881/photo-forensics/
+  verdoliva_2020:
+    type: paper
+    citation: 'VERDOLIVA, L. Media Forensics and DeepFakes: an overview. IEEE Journal
+      of Selected Topics in Signal Processing, 2020.'
+    file: papers/README_Verdoliva_2020.txt
+    url: https://arxiv.org/abs/2001.06564
+  c2pa_2_4:
+    type: guideline
+    citation: C2PA. Coalition for Content Provenance and Authenticity. C2PA Technical
+      Specification, version 2.4, 2026.
+    file: guidelines/C2PA_Specification_2_4.txt
+    url: https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html
+  popescu_farid_2005:
+    type: paper
+    citation: POPESCU, A. C.; FARID, H. Exposing Digital Forgeries by Detecting Traces
+      of Resampling. IEEE Transactions on Signal Processing, v. 53, n. 2, p. 758-767,
+      2005.
+    file: papers/Popescu_Farid_2005_Resampling.txt
+    url: https://farid.berkeley.edu/downloads/publications/tsp05.pdf
+  fridrich_steganography_2010:
+    type: book
+    citation: 'FRIDRICH, J. Steganography in Digital Media: Principles, Algorithms,
+      and Applications. Cambridge University Press, 2010.'
+    file: books/README_Steganography_Fridrich.txt
+    url: https://www.cambridge.org/core/books/steganography-in-digital-media/4D40E55024AA8A7E04F50B3B1F86F121
+  durall_2020:
+    type: paper
+    citation: 'DURALL, R.; KEUPER, M.; KEUPER, J. Watch Your Up-Convolution: CNN Based
+      Generative Deep Neural Networks Are Failing to Reproduce Spectral Distributions.
+      CVPR, 2020.'
+    file: papers/Durall_Keuper_Keuper_2020_Spectral_Distributions.txt
+    url: https://openaccess.thecvf.com/content_CVPR_2020/html/Durall_Watch_Your_Up-Convolution_CNN_Based_Generative_Deep_Neural_Networks_Are_Failing_CVPR_2020_paper.html
+  veritas_2025:
+    type: software
+    citation: ADEEL, R. Veritas - Forensic Image Analysis Toolkit. GitHub, 2025. Software
+      sob licença BSD 3-Clause.
+    file: software/CodeRafay_Veritas.txt
+    url: https://github.com/CodeRafay/Forensic-Image-Analysis-Toolkit

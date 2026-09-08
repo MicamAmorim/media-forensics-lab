@@ -1,0 +1,3 @@
+ADEEL, R. Veritas - Forensic Image Analysis Toolkit. GitHub, 2025. Software sob licença BSD 3-Clause.
+
+Fonte: https://github.com/CodeRafay/Forensic-Image-Analysis-Toolkit

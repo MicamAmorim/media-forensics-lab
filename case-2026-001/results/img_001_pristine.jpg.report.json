@@ -1,0 +1,822 @@
+{
+  "schema_version": "0.2",
+  "file": "case-2026-001/original/img_001_pristine.jpg",
+  "sha256": "011901a3f9084e22497e2b27642b44a39e8965c4c2febc5ddf2c3ccf298c8787",
+  "size_bytes": 99308,
+  "analyzed_at": "2026-09-08T18:25:34.946428+00:00",
+  "profile": "full",
+  "environment": {
+    "python": "3.13.5",
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+    "mflab_version": "0.2.0",
+    "veritas_integration": {
+      "toolkit": "CodeRafay/Forensic-Image-Analysis-Toolkit (Veritas)",
+      "path": "/mnt/data/media-forensics-lab/.external/Forensic-Image-Analysis-Toolkit",
+      "installed": false,
+      "features": {
+        "ela": false,
+        "metadata": false,
+        "histogram": false,
+        "noise_map": false,
+        "jpeg_ghost": false,
+        "quantization": false,
+        "copy_move": false,
+        "prnu": false,
+        "frequency": false,
+        "deepfake": false,
+        "gan_fingerprint": false,
+        "resampling": false,
+        "steganography": false,
+        "hash_verification": false
+      },
+      "license": "BSD-3-Clause",
+      "mode": "optional_secondary_implementation",
+      "known_upstream_issues": {
+        "deepfake": "Current upstream implementation is a simplified heuristic and contains a use-after-delete bug in detect_deepfake_artifacts; never use its output as a forensic conclusion.",
+        "prnu": "Upstream implementation is a single-image Gaussian residual heuristic, not a calibrated multi-reference camera fingerprint/PCE procedure.",
+        "hash_verification": "Upstream 'blockchain' wording refers to a local JSON provenance database, not a cryptographic blockchain network."
+      }
+    }
+  },
+  "methods": {
+    "hash_sha256": {
+      "sha256": "011901a3f9084e22497e2b27642b44a39e8965c4c2febc5ddf2c3ccf298c8787"
+    },
+    "c2pa": {
+      "status": "unavailable",
+      "tool": "c2patool",
+      "reason": "c2patool_not_found",
+      "note": "Install the official C2PA CLI to enable cryptographic provenance validation."
+    },
+    "metadata": {
+      "file": "case-2026-001/original/img_001_pristine.jpg",
+      "kind": "image",
+      "format": "JPEG",
+      "mode": "RGB",
+      "size": [
+        512,
+        512
+      ],
+      "exif": {}
+    },
+    "perceptual_hashes": {
+      "ahash": "7f775fc744f8a040",
+      "dhash": "dd8dbd0d9d3295a6",
+      "phash": "c2924c5532bddfc0",
+      "note": "Perceptual hashes are for similarity/provenance triage, not file integrity."
+    },
+    "ela": {
+      "mean_abs_error": 1.866087555885315,
+      "max_error": 32,
+      "quality": 90,
+      "warning": "ELA is exploratory only and is not proof of manipulation."
+    },
+    "noise_residual": {
+      "mean": -2.944225798273692e-06,
+      "std": 0.032629262655973434,
+      "mad": 0.0051345136016607285
+    },
+    "noise_map": {
+      "residual_mean": -3.591344466258306e-06,
+      "residual_std": 0.03802305832505226,
+      "residual_mad": 0.006097130477428436,
+      "block_size": 64,
+      "blocks": 64,
+      "local_std_mean": 0.032235680337180384,
+      "local_std_cv": 0.6254482525564651,
+      "warning": "Noise residual inconsistency is a screening clue; scene texture, denoising, HDR and recompression can create similar patterns."
+    },
+    "histogram": {
+      "channels": {
+        "R": {
+          "mean": 141.54742431640625,
+          "std": 82.06250275241352,
+          "entropy_bits": 7.3644041330493035,
+          "zero_bins": 0,
+          "clipped_black_fraction": 0.1015625,
+          "clipped_white_fraction": 0.0060882568359375
+        },
+        "G": {
+          "mean": 105.79202270507812,
+          "std": 76.50425810782293,
+          "entropy_bits": 7.418857712834207,
+          "zero_bins": 0,
+          "clipped_black_fraction": 0.113739013671875,
+          "clipped_white_fraction": 0.001583099365234375
+        },
+        "B": {
+          "mean": 96.45427703857422,
+          "std": 77.54561001275414,
+          "entropy_bits": 7.340556107550817,
+          "zero_bins": 0,
+          "clipped_black_fraction": 0.129913330078125,
+          "clipped_white_fraction": 0.002765655517578125
+        }
+      },
+      "warning": "Histogram anomalies are non-specific and require contextual interpretation.",
+      "gray_dynamic_range": 255
+    },
+    "frequency": {
+      "radial_profile": [
+        13.798526763916016,
+        13.231539726257324,
+        12.551506042480469,
+        12.030174255371094,
+        11.642909049987793,
+        11.375588417053223,
+        11.195821762084961,
+        10.963058471679688,
+        10.758572578430176,
+        10.672471046447754,
+        10.478228569030762,
+        10.396236419677734,
+        10.206656455993652,
+        10.103614807128906,
+        9.970770835876465,
+        9.902792930603027,
+        9.806200981140137,
+        9.766287803649902,
+        9.616981506347656,
+        9.530219078063965,
+        9.40268611907959,
+        9.325788497924805,
+        9.310580253601074,
+        9.272066116333008,
+        9.20395278930664,
+        9.126322746276855,
+        8.996066093444824,
+        8.935957908630371,
+        8.923751831054688,
+        8.88651180267334,
+        8.797709465026855,
+        8.761500358581543,
+        8.712859153747559,
+        8.684629440307617,
+        8.60482406616211,
+        8.611368179321289,
+        8.539161682128906,
+        8.507137298583984,
+        8.465415000915527,
+        8.420207977294922,
+        8.413061141967773,
+        8.349013328552246,
+        8.313493728637695,
+        8.265351295471191,
+        8.21004581451416,
+        8.166828155517578,
+        8.124743461608887,
+        8.0530424118042,
+        8.048174858093262,
+        8.01356029510498,
+        7.970974922180176,
+        7.908515453338623,
+        7.87157678604126,
+        7.857328414916992,
+        7.8618950843811035,
+        7.849870681762695,
+        7.7984299659729,
+        7.75358247756958,
+        7.712623596191406,
+        7.705012798309326,
+        7.675161361694336,
+        7.689901351928711,
+        7.649141788482666,
+        7.648180961608887
+      ],
+      "high_low_frequency_ratio": 0.708246323716118,
+      "spectral_peak_indices": [],
+      "spectral_peak_count": 0,
+      "quadrant_mean_cv": 0.005489547357865702,
+      "warning": "Frequency-domain patterns are model- and processing-dependent; use only as one evidence family."
+    },
+    "resampling": {
+      "x_autocorrelation": [
+        0.938307377014482,
+        0.859213847996046,
+        0.7942454828069812,
+        0.7543085529271081,
+        0.726006864418875,
+        0.7012718192766196,
+        0.6781758995602429,
+        0.6612863388979648,
+        0.6526185696603279,
+        0.6459873679140702,
+        0.6446767473722984,
+        0.6420179099986052,
+        0.624097171294243,
+        0.59843635385527,
+        0.5735486015448195,
+        0.5585412655250305,
+        0.5488252660699371,
+        0.5324426346627653,
+        0.5083851502629018,
+        0.49110703010316764,
+        0.4907506743136566,
+        0.49950281592333684,
+        0.49870017870759253,
+        0.48027158995168207,
+        0.44320222039639345,
+        0.4084410077719086,
+        0.38319369210715426,
+        0.36737837157256614,
+        0.3524811545458779,
+        0.3387661685540834,
+        0.33525820586949834,
+        0.3444298446083996
+      ],
+      "y_autocorrelation": [
+        0.9147336229387965,
+        0.8456056709699523,
+        0.7743326194525886,
+        0.7188570657884468,
+        0.6869869444748316,
+        0.6561293533401311,
+        0.6379977005037186,
+        0.6088791436353497,
+        0.5740030997382206,
+        0.5499517200176273,
+        0.5243154490408467,
+        0.49804982092379835,
+        0.47633713909414716,
+        0.45217883830101674,
+        0.43767227769884587,
+        0.4290394372636135,
+        0.42325992944243956,
+        0.4102110422488966,
+        0.3963156966054393,
+        0.3856274628998839,
+        0.3783499133249382,
+        0.3721153919564349,
+        0.35853506355603026,
+        0.3411217917754425,
+        0.3187253392934269,
+        0.29550572061060315,
+        0.2723504990025295,
+        0.2546811425059115,
+        0.23095037943218627,
+        0.20179758712670032,
+        0.1763708154777959,
+        0.13763005873540377
+      ],
+      "max_nonzero_autocorrelation": 0.938307377014482,
+      "warning": "This is a resampling screening heuristic, not a calibrated detector. Confirm with a published/validated method before evidentiary use."
+    },
+    "prnu_screen": {
+      "residual_std": 0.03260371461510658,
+      "local_energy_mean": 0.027447373257018626,
+      "local_energy_cv": 0.6410482146710064,
+      "blocks": 64,
+      "status": "screening_only",
+      "warning": "This is not source-camera identification. A forensic PRNU comparison should build a fingerprint from multiple known images and use a calibrated correlation/PCE procedure."
+    },
+    "face_artifacts": {
+      "faces_detected": 1,
+      "faces_analyzed": 1,
+      "face_metrics": [
+        {
+          "bbox": [
+            177,
+            66,
+            94,
+            94
+          ],
+          "laplacian_variance": 962.8191528320312,
+          "left_right_mean_luminance_asymmetry": 0.08638280119653112,
+          "boundary_edge_density": 0.16629213094711304,
+          "interior_edge_density": 0.16893424093723297
+        }
+      ],
+      "status": "screening_only",
+      "warning": "These are generic face-region measurements, not a validated deepfake classifier. Compression, makeup, lighting and camera processing can dominate them."
+    },
+    "synthetic_spectral": {
+      "features": {
+        "radial_profile": [
+          13.798526763916016,
+          13.231539726257324,
+          12.551506042480469,
+          12.030174255371094,
+          11.642909049987793,
+          11.375588417053223,
+          11.195821762084961,
+          10.963058471679688,
+          10.758572578430176,
+          10.672471046447754,
+          10.478228569030762,
+          10.396236419677734,
+          10.206656455993652,
+          10.103614807128906,
+          9.970770835876465,
+          9.902792930603027,
+          9.806200981140137,
+          9.766287803649902,
+          9.616981506347656,
+          9.530219078063965,
+          9.40268611907959,
+          9.325788497924805,
+          9.310580253601074,
+          9.272066116333008,
+          9.20395278930664,
+          9.126322746276855,
+          8.996066093444824,
+          8.935957908630371,
+          8.923751831054688,
+          8.88651180267334,
+          8.797709465026855,
+          8.761500358581543,
+          8.712859153747559,
+          8.684629440307617,
+          8.60482406616211,
+          8.611368179321289,
+          8.539161682128906,
+          8.507137298583984,
+          8.465415000915527,
+          8.420207977294922,
+          8.413061141967773,
+          8.349013328552246,
+          8.313493728637695,
+          8.265351295471191,
+          8.21004581451416,
+          8.166828155517578,
+          8.124743461608887,
+          8.0530424118042,
+          8.048174858093262,
+          8.01356029510498,
+          7.970974922180176,
+          7.908515453338623,
+          7.87157678604126,
+          7.857328414916992,
+          7.8618950843811035,
+          7.849870681762695,
+          7.7984299659729,
+          7.75358247756958,
+          7.712623596191406,
+          7.705012798309326,
+          7.675161361694336,
+          7.689901351928711,
+          7.649141788482666,
+          7.648180961608887
+        ],
+        "high_low_frequency_ratio": 0.708246323716118,
+        "spectral_peak_indices": [],
+        "spectral_peak_count": 0,
+        "quadrant_mean_cv": 0.005489547357865702,
+        "warning": "Frequency-domain patterns are model- and processing-dependent; use only as one evidence family."
+      },
+      "screening_flags": [
+        "high_spectral_quadrant_symmetry"
+      ],
+      "status": "screening_only",
+      "warning": "Spectral fingerprints are generator- and post-processing-dependent. A flag is not a probability that the image was AI-generated."
+    },
+    "jpeg_quantization": {
+      "available": true,
+      "table_count": 2,
+      "tables": {
+        "0": [
+          2,
+          1,
+          1,
+          2,
+          2,
+          4,
+          5,
+          6,
+          1,
+          1,
+          1,
+          2,
+          3,
+          6,
+          6,
+          6,
+          1,
+          1,
+          2,
+          2,
+          4,
+          6,
+          7,
+          6,
+          1,
+          2,
+          2,
+          3,
+          5,
+          9,
+          8,
+          6,
+          2,
+          2,
+          4,
+          6,
+          7,
+          11,
+          10,
+          8,
+          2,
+          4,
+          6,
+          6,
+          8,
+          10,
+          11,
+          9,
+          5,
+          6,
+          8,
+          9,
+          10,
+          12,
+          12,
+          10,
+          7,
+          9,
+          10,
+          10,
+          11,
+          10,
+          10,
+          10
+        ],
+        "1": [
+          2,
+          2,
+          2,
+          5,
+          10,
+          10,
+          10,
+          10,
+          2,
+          2,
+          3,
+          7,
+          10,
+          10,
+          10,
+          10,
+          2,
+          3,
+          6,
+          10,
+          10,
+          10,
+          10,
+          10,
+          5,
+          7,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      "fingerprints": {
+        "0": {
+          "sum": 369,
+          "mean": 5.765625,
+          "min": 1,
+          "max": 12,
+          "first_16": [
+            2,
+            1,
+            1,
+            2,
+            2,
+            4,
+            5,
+            6,
+            1,
+            1,
+            1,
+            2,
+            3,
+            6,
+            6,
+            6
+          ]
+        },
+        "1": {
+          "sum": 558,
+          "mean": 8.71875,
+          "min": 2,
+          "max": 10,
+          "first_16": [
+            2,
+            2,
+            2,
+            5,
+            10,
+            10,
+            10,
+            10,
+            2,
+            2,
+            3,
+            7,
+            10,
+            10,
+            10,
+            10
+          ]
+        }
+      },
+      "warning": "Quantization tables can indicate encoding history/software families but are not unique identifiers of manipulation."
+    },
+    "jpeg_ghost": {
+      "quality_sweep": [
+        {
+          "quality": 55,
+          "mean_abs_error": 3.41802978515625,
+          "local_cv": 0.5881353044620328
+        },
+        {
+          "quality": 60,
+          "mean_abs_error": 3.276036500930786,
+          "local_cv": 0.5813931535500636
+        },
+        {
+          "quality": 65,
+          "mean_abs_error": 3.1012890338897705,
+          "local_cv": 0.5762664993873933
+        },
+        {
+          "quality": 70,
+          "mean_abs_error": 2.9917423725128174,
+          "local_cv": 0.5276877866481137
+        },
+        {
+          "quality": 75,
+          "mean_abs_error": 2.7197203636169434,
+          "local_cv": 0.5606942272624311
+        },
+        {
+          "quality": 80,
+          "mean_abs_error": 2.5008606910705566,
+          "local_cv": 0.5574468033182259
+        },
+        {
+          "quality": 85,
+          "mean_abs_error": 2.1522510051727295,
+          "local_cv": 0.5336481002404875
+        },
+        {
+          "quality": 90,
+          "mean_abs_error": 1.8660876750946045,
+          "local_cv": 0.5370154582550953
+        },
+        {
+          "quality": 95,
+          "mean_abs_error": 0.38439053297042847,
+          "local_cv": 1.0498166908378175
+        },
+        {
+          "quality": 100,
+          "mean_abs_error": 0.4182701110839844,
+          "local_cv": 0.8785250601862766
+        }
+      ],
+      "minimum_error_quality": 95,
+      "minimum_mean_abs_error": 0.38439053297042847,
+      "warning": "JPEG ghost analysis is exploratory; prior recompression may be benign and social-media pipelines can dominate the signal."
+    },
+    "jpeg_dct": {
+      "score": 0.023081606793671824,
+      "n_blocks": 4096,
+      "zero_bin_fraction": 0.006578947368421052,
+      "warning": "Heuristic indicator; cite/validate a published detector before evidentiary use."
+    },
+    "copy_move_orb": {
+      "keypoints": 2500,
+      "suspicious_pairs": 0,
+      "score": 0.0,
+      "warning": "Feature matching is a screening detector; repetitive textures can cause false positives."
+    },
+    "steganography_lsb": {
+      "channels": {
+        "R": {
+          "n0": 142724,
+          "n1": 119420,
+          "p1": 0.4555511474609375,
+          "entropy_bits": 0.9942918010194437,
+          "chi2": 2071.672119140625,
+          "pvalue": 0.0
+        },
+        "G": {
+          "n0": 144956,
+          "n1": 117188,
+          "p1": 0.4470367431640625,
+          "entropy_bits": 0.991890968935843,
+          "chi2": 2941.367431640625,
+          "pvalue": 0.0
+        },
+        "B": {
+          "n0": 147008,
+          "n1": 115136,
+          "p1": 0.439208984375,
+          "entropy_bits": 0.9893104764339582,
+          "chi2": 3875.0625,
+          "pvalue": 0.0
+        }
+      },
+      "warning": "Balanced LSBs are not proof of steganography; modern embedding and natural image statistics require specialized steganalysis."
+    },
+    "deepfake_protocol": {
+      "protocol_version": "MFLAB-DF-0.2",
+      "media_type": "image",
+      "stages": [
+        "integrity_and_provenance",
+        "metadata_and_encoding",
+        "classical_image_forensics",
+        "face_region_screening_when_applicable",
+        "synthetic_frequency_screening",
+        "validated_external_model_ensemble_when_configured",
+        "manual_cross-method_review"
+      ],
+      "evidence_families": [
+        {
+          "family": "frequency",
+          "signals": [
+            "high_spectral_quadrant_symmetry"
+          ],
+          "strength": "screening"
+        },
+        {
+          "family": "resampling",
+          "signals": [
+            "periodic_second_derivative_autocorrelation"
+          ],
+          "strength": "screening"
+        }
+      ],
+      "external_models": [],
+      "validated_external_models": 0,
+      "triage_assessment": "needs_expert_review",
+      "evidentiary_conclusion": "inconclusive",
+      "decision_policy": "Do not label authentic/AI-generated from a single heuristic or classifier. Seek convergence across independent evidence families and provenance/context.",
+      "limitations": [
+        "Unknown generators and domain shift can defeat learned detectors.",
+        "JPEG recompression, screenshots and social networks may erase or create artifacts.",
+        "A real image may be locally AI-edited; a synthetic image may be post-processed to mimic camera statistics.",
+        "Absence of detected artifacts is not proof of authenticity."
+      ]
+    }
+  },
+  "method_registry": {
+    "hash_sha256": {
+      "refs": [
+        "cpp_chain_custody",
+        "swgde_integrity"
+      ]
+    },
+    "c2pa": {
+      "refs": [
+        "c2pa_2_4"
+      ]
+    },
+    "metadata": {
+      "refs": [
+        "swgde_image_auth",
+        "swgde_video_auth"
+      ]
+    },
+    "perceptual_hashes": {
+      "refs": [
+        "farid_photo_forensics"
+      ],
+      "screening_only": true
+    },
+    "ela": {
+      "refs": [
+        "farid_photo_forensics"
+      ],
+      "screening_only": true
+    },
+    "noise_residual": {
+      "refs": [
+        "verdoliva_2020",
+        "trufor_2023"
+      ],
+      "screening_only": true
+    },
+    "noise_map": {
+      "refs": [
+        "verdoliva_2020",
+        "trufor_2023"
+      ],
+      "screening_only": true
+    },
+    "histogram": {
+      "refs": [
+        "farid_photo_forensics"
+      ],
+      "screening_only": true
+    },
+    "frequency": {
+      "refs": [
+        "verdoliva_2020"
+      ],
+      "screening_only": true
+    },
+    "resampling": {
+      "refs": [
+        "popescu_farid_2005"
+      ],
+      "screening_only": true
+    },
+    "prnu_screen": {
+      "refs": [
+        "lukas_fridrich_goljan_2005"
+      ],
+      "screening_only": true
+    },
+    "face_artifacts": {
+      "refs": [
+        "verdoliva_2020",
+        "faceforensics_2019"
+      ],
+      "screening_only": true
+    },
+    "synthetic_spectral": {
+      "refs": [
+        "verdoliva_2020",
+        "durall_2020"
+      ],
+      "screening_only": true
+    },
+    "jpeg_quantization": {
+      "refs": [
+        "lukas_fridrich_2003"
+      ],
+      "screening_only": true
+    },
+    "jpeg_ghost": {
+      "refs": [
+        "farid_photo_forensics",
+        "lukas_fridrich_2003"
+      ],
+      "screening_only": true
+    },
+    "jpeg_dct": {
+      "refs": [
+        "lukas_fridrich_2003"
+      ],
+      "screening_only": true
+    },
+    "copy_move_orb": {
+      "refs": [
+        "fridrich_soukal_lukas_2003"
+      ],
+      "screening_only": true
+    },
+    "steganography_lsb": {
+      "refs": [
+        "fridrich_steganography_2010"
+      ],
+      "screening_only": true
+    },
+    "deepfake_protocol": {
+      "refs": [
+        "verdoliva_2020",
+        "deepfakebench_2023",
+        "faceforensics_2019",
+        "celebdf_2020"
+      ]
+    }
+  }
+}
