@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <title>MFLab • Laudo Interativo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}" />
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">MF</span><div><strong>MFLab</strong><small>Media Forensics Laboratory</small></div></div>
+    <div class="top-actions"><span class="version">v0.5 • interface local</span><button id="printBtn" class="ghost" type="button">Imprimir / PDF</button></div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div><span class="eyebrow">LAUDO TÉCNICO INTERATIVO</span><h1>Analise imagens e navegue pelos vestígios.</h1>
+        <p>Importe uma ou várias imagens, execute o pipeline forense e explore resultados, indicadores, hashes e métodos em uma interface visual. Os sinais exibidos são de triagem e não constituem veredito automático.</p>
+      </div>
+      <div class="hero-badge"><span class="pulse"></span><b>Pipeline local</b><small>arquivos permanecem na máquina que executa o servidor</small></div>
+    </section>
+
+    <section class="panel upload-panel">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Selecionar imagens">
+        <input id="fileInput" type="file" accept="image/*,.heic,.heif" multiple hidden />
+        <div class="upload-icon">↥</div><h2>Arraste imagens para cá</h2><p>ou clique para selecionar até 50 arquivos</p>
+        <div id="fileChips" class="file-chips"></div>
+      </div>
+      <div class="controls">
+        <label>Perfil<select id="profile">{% for p in profiles %}<option value="{{ p }}" {% if p == 'full' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+        <button id="analyzeBtn" class="primary" type="button">Executar análise</button>
+      </div>
+      <div id="progress" class="progress hidden"><div class="progress-line"></div><span>Executando métodos forenses…</span></div>
+      <div id="errorBox" class="error hidden"></div>
+    </section>
+
+    <section id="results" class="hidden">
+      <div class="section-head"><div><span class="eyebrow">RESULTADOS</span><h2 id="runTitle">Execução</h2></div>
+        <div class="download-menu"><a id="downloadDocx" class="primary link-btn" href="#">Baixar laudo DOCX</a><a id="downloadMd" class="ghost link-btn" href="#">Markdown</a><a id="downloadJson" class="ghost link-btn" href="#">JSON técnico</a></div>
+      </div>
+
+      <div id="summaryCards" class="summary-grid"></div>
+      <div class="notice"><b>Leitura correta dos gráficos:</b> barras representam contagens de indicadores emitidos por famílias de triagem. Não são probabilidades, percentuais de falsificação nem peso probatório.</div>
+      <div id="overviewChart" class="panel chart-card"></div>
+      <div id="fileResults" class="file-results"></div>
+    </section>
+  </main>
+
+  <footer> MFLab • análise técnico-forense assistida • conclusão automática permanece limitada pelas metodologias executadas.</footer>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

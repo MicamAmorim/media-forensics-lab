@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 - 2026-09-08
+
+### Added
+- Local interactive HTML forensic report via `mflab web`.
+- Drag-and-drop multi-image upload with profiles `quick`, `deepfake` and `full`.
+- Responsive dashboard with image previews, SHA-256, triage state, per-family screening charts and expandable method results.
+- Download actions for DOCX, Markdown and technical JSON, plus browser print/PDF mode.
+- Temporary local case creation and cleanup of web runs older than 24 hours.
+- Web smoke tests for index, health endpoint and multi-image upload contract.
+
+### Safety and interpretation
+- The web server binds to `127.0.0.1` by default.
+- Charts show counts of screening indicators only; they are not probabilities, falsification percentages or evidentiary weights.
+- The interface preserves the evidentiary safeguards of `MFLAB-DF-0.4` and does not turn native heuristics into automatic verdicts.
+
 ## 0.4.0 - 2026-09-08
 
 ### Added
@@ -17,7 +32,7 @@
 - Unicode-safe image loading strengthened for Windows paths.
 
 ### Validation
-- 31 automated tests pass in the internal Linux environment.
+- 31 automated tests pass in the v0.4 CI after fixture portability fixes.
 - Demo validation: 16/16 required controlled checks pass, 0 failures.
 - Important limitation: several new successes are reference-assisted or provenance-based; they do not establish reference-free population-level deepfake accuracy.
 
@@ -32,13 +47,7 @@
 - Copy-move ORB now suppresses identity matches and clusters coherent translations.
 - Deepfake protocol upgraded to MFLAB-DF-0.3: uncalibrated native heuristics are recorded as screening observations and cannot alone trigger a deepfake-specific escalation.
 - Resampling screening uses short-lag persistence instead of treating raw lag-1 autocorrelation as discriminative.
-- Preliminary report now surfaces copy-move and abrupt-transition findings without falsely escalating pristine imagery as deepfake evidence.
-- Project version bumped to 0.3.0.
-
-### Validation
-- 22 automated tests pass in the internal Linux environment.
-- Demo harness: 9/9 required regression checks pass; 3 capability gaps are explicitly marked unsupported.
-- Regenerated DOCX report rendered to 21 pages and visually reviewed; no clipping/overlap observed.
+- Preliminary report surfaces copy-move and abrupt-transition findings without falsely escalating pristine imagery as deepfake evidence.
 
 ## 0.2.0 - 2026-09-08
 
@@ -50,5 +59,3 @@
 - Optional DeepfakeBench integration via exported, explicitly validated model results.
 - External model evidence schema at `case/external/deepfake_scores.json`.
 - GitHub Actions CI for Python 3.10-3.12.
-- Upstream evaluation and third-party attribution notice.
-- Expanded preliminary report section for synthetic media/deepfake analysis.
