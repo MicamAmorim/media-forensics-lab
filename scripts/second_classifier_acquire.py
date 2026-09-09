@@ -7,12 +7,12 @@ from mf_lab.training.selective_acquisition import (
     DEFAULT_BACKBONE,
     DEFAULT_OOD_GENERATORS,
     DEFAULT_SEED,
-    build_selective_plan,
     materialize_plan,
 )
 from mf_lab.training.selective_embeddings import (
     extract_verified_materialized_embeddings,
 )
+from mf_lab.training.selective_remote_search import build_selective_plan_search
 
 
 def parser() -> argparse.ArgumentParser:
@@ -58,7 +58,7 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     if args.command == "build-plan":
-        result = build_selective_plan(
+        result = build_selective_plan_search(
             args.out,
             cache_dir=args.cache_dir,
             fit_per_generator=args.fit_per_generator,
