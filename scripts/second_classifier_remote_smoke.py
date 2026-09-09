@@ -10,7 +10,7 @@ from PIL import Image
 
 from mf_lab.training import selective_acquisition as sa
 from mf_lab.training.selective_embeddings import validate_materialized_manifest
-from mf_lab.training.selective_remote_search import fetch_generator_rows_search
+from mf_lab.training.selective_remote_rows import fetch_generator_quota_rows
 
 
 def _pick_real(ids: list[str], prefix: str, count: int) -> list[str]:
@@ -44,21 +44,25 @@ def main() -> int:
 
     rows: list[dict] = []
 
-    # 50 synthetic images across an old GAN, a recent proprietary diffusion
-    # generator and a 2024 model family. Search results are filtered locally by
-    # exact generator equality and must match the official 4000/1000 row count.
-    synthetic_specs = [
-        ("train", "CycleGAN", "fit", "seen", 20),
-        ("validation", "DALL-E 3", "iid_test", "ood-smoke", 15),
-        ("validation", "FLUX 1 Schnell", "ood_test", "ood", 15),
-    ]
-    for split, generator, role, status, count in synthetic_specs:
-        candidates = fetch_generator_rows_search(split, generator, cache_dir=cache)
-        selected = sa._deterministic_take(
-            candidates, count, sa.DEFAULT_SEED, "remote-smoke", split, generator
-        )
-        for rank, row in enumerate(selected, 1):
-            rows.append(sa._fake_manifest_row(row, role, status, rank))
+    # 50 synthetic images collected from deterministic random pages across the
+    # split, avoiding Dataset Viewer filter/search indexes that time out on this
+    # 35 GB image dataset.
+    train_selected, train_scan = fetch_generator_quota_rows(
+        "train", {"CycleGAN": 20}, cache_dir=cache, seed=sa.DEFAULT_SEED
+    )
+    val_selected, val_scan = fetch_generator_quota_rows(
+        "validation",
+        {"DALL-E 3": 15, "FLUX 1 Schnell": 15},
+        cache_dir=cache,
+        seed=sa.DEFAULT_SEED,
+    )
+
+    for rank, row in enumerate(train_selected["CycleGAN"], 1):
+        rows.append(sa._fake_manifest_row(row, "fit", "seen", rank))
+    for rank, row in enumerate(val_selected["DALL-E 3"], 1):
+        rows.append(sa._fake_manifest_row(row, "iid_test", "ood-smoke", rank))
+    for rank, row in enumerate(val_selected["FLUX 1 Schnell"], 1):
+        rows.append(sa._fake_manifest_row(row, "ood_test", "ood", rank))
 
     # 50 official real controls: COCO on both benchmark splits plus LAION on
     # validation. These IDs come from AI-GenBench's published real-file lists.
@@ -116,9 +120,10 @@ def main() -> int:
         total_bytes += info["bytes"]
 
     report = {
-        "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-REMOTE-SMOKE-0.2",
-        "remote_backend": "dataset_viewer_search_exact_generator_gate",
+        "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-REMOTE-SMOKE-0.3",
+        "remote_backend": "dataset_viewer_rows_random_page_scan",
         "rows": len(materialized),
+        "scan": {"train": train_scan, "validation": val_scan},
         "acquisition": acquisition,
         "verification": verification,
         "source_kind_counts": dict(source_counts),
