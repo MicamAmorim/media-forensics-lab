@@ -11,13 +11,13 @@
   <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
   <header class="topbar">
     <div class="brand"><span class="brand-mark">MF</span><div><strong>MFLab</strong><small>Media Forensics Laboratory</small></div></div>
-    <div class="top-actions"><span class="version">v0.5 • interface local</span><button id="printBtn" class="ghost" type="button">Imprimir / PDF</button></div>
+    <div class="top-actions"><span class="version">v{{ version }} • interface local</span><button id="printBtn" class="ghost" type="button">Imprimir / PDF</button></div>
   </header>
 
   <main class="shell">
     <section class="hero">
       <div><span class="eyebrow">LAUDO TÉCNICO INTERATIVO</span><h1>Analise imagens e navegue pelos vestígios.</h1>
-        <p>Importe uma ou várias imagens, execute o pipeline forense e explore resultados, indicadores, hashes e métodos em uma interface visual. Os sinais exibidos são de triagem e não constituem veredito automático.</p>
+        <p>Importe uma ou várias imagens, execute o pipeline forense e explore resultados, indicadores, hashes, métodos e artefatos visuais em uma interface local. Os sinais exibidos são de triagem e não constituem veredito automático.</p>
       </div>
       <div class="hero-badge"><span class="pulse"></span><b>Pipeline local</b><small>arquivos permanecem na máquina que executa o servidor</small></div>
     </section>
@@ -42,9 +42,22 @@
       </div>
 
       <div id="summaryCards" class="summary-grid"></div>
-      <div class="notice"><b>Leitura correta dos gráficos:</b> barras representam contagens de indicadores emitidos por famílias de triagem. Não são probabilidades, percentuais de falsificação nem peso probatório.</div>
-      <div id="overviewChart" class="panel chart-card"></div>
-      <div id="fileResults" class="file-results"></div>
+
+      <div class="result-tabs" role="tablist" aria-label="Seções do laudo interativo">
+        <button class="result-tab active" type="button" data-tab="summary" role="tab" aria-selected="true">Resumo e métodos</button>
+        <button class="result-tab" type="button" data-tab="visuals" role="tab" aria-selected="false">Gráficos e imagens</button>
+      </div>
+
+      <div id="tab-summary" class="tab-panel active" role="tabpanel">
+        <div class="notice"><b>Leitura correta dos gráficos:</b> barras representam contagens de indicadores emitidos por famílias de triagem. Não são probabilidades, percentuais de falsificação nem peso probatório.</div>
+        <div id="overviewChart" class="panel chart-card"></div>
+        <div id="fileResults" class="file-results"></div>
+      </div>
+
+      <div id="tab-visuals" class="tab-panel" role="tabpanel">
+        <div class="notice"><b>Artefatos visuais:</b> imagens e gráficos abaixo são produtos derivados para inspeção e documentação. Uma área visualmente saliente não constitui, por si só, prova de manipulação ou geração sintética.</div>
+        <div id="artifactGallery" class="artifact-files"></div>
+      </div>
     </section>
   </main>
 
