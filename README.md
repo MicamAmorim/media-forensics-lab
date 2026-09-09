@@ -190,7 +190,26 @@ O GT canônico exige 100% de cobertura e 100% de aprovação dos checks obrigat�
 <!-- CIFAKE_V09_START -->
 ## Classificador automático embarcado e validação CIFAKE — v0.9
 
-Esta seção é atualizada automaticamente pelo workflow reprodutível de treinamento da v0.9 com as métricas do modelo exportado e os gráficos de validação.
+A v0.9 inclui o modelo calibrado **`mflab_cifake_hgb_calibrated_v1`**, treinado sobre o `synthetic_handcrafted_v2` (73 features) e embarcado no pacote. O modelo produz um voto computacional `real`/`synthetic` e um score da classe sintética. Esse voto aparece no JSON e no site como **Classificação automática**, mas permanece separado da conclusão pericial `evidentiary_conclusion`.
+
+Para evitar apresentar como "holdout intocado" um conjunto que já havia sido consultado durante o desenvolvimento da v0.8, a validação v0.9 reconstrói o subconjunto de desenvolvimento anterior e reserva, a partir do seu complemento, um **holdout fresco de 10,000 imagens**. O modelo final é ajustado em 90,000 imagens do train original. O teste oficial de 20,000 imagens também é reportado, mas como resultado secundário.
+
+| Avaliação | Accuracy | Sensibilidade | Especificidade | FPR | ROC-AUC | PR-AUC |
+|---|---:|---:|---:|---:|---:|---:|
+| Holdout fresco primário | 92.42% | 92.62% | 92.22% | 7.78% | 0.9784 | 0.9787 |
+| Teste oficial CIFAKE (secundário) | 92.38% | 92.71% | 92.04% | 7.96% | 0.9792 | 0.9795 |
+
+O domínio validado continua estreito: **CIFAR-10 real vs Stable Diffusion v1.4, 32×32**. Para imagens arbitrárias o MFLab ainda gera a classificação automática, mas marca `validated_for_input: false` salvo confirmação explícita do domínio pelo examinador. Isso evita transformar uma boa métrica in-domain em alegação universal de detecção de IA.
+
+![ROC CIFAKE](docs/assets/validation/cifake_roc.png)
+
+![Precision-Recall CIFAKE](docs/assets/validation/cifake_pr.png)
+
+![Matriz de confusão CIFAKE](docs/assets/validation/cifake_confusion.png)
+
+![Calibração CIFAKE](docs/assets/validation/cifake_calibration.png)
+
+Relatório completo: [`validation/scientific/CIFAKE_V09_RESULT.md`](validation/scientific/CIFAKE_V09_RESULT.md). Metadados do modelo: [`mf_lab/models/mflab_cifake_hgb_calibrated_v1.json`](mf_lab/models/mflab_cifake_hgb_calibrated_v1.json).
 <!-- CIFAKE_V09_END -->
 
 ## Validação nível 2 — benchmark científico

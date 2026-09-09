@@ -1,0 +1,207 @@
+{
+  "protocol": "MFLAB-SCI-CIFAKE-0.2",
+  "mflab_version": "0.9.0",
+  "mflab_base_sha": "0285b6cfad137db552dfbf8a5158c14d26791822",
+  "dataset": {
+    "name": "CIFAKE",
+    "source": "dragonintelligence/CIFAKE-image-dataset",
+    "reference": "Bird & Lotfi, CIFAKE",
+    "real_source": "CIFAR-10",
+    "synthetic_source": "Stable Diffusion v1.4",
+    "resolution": [
+      32,
+      32
+    ],
+    "train_parquet_sha256": "c906031ad6ac44c7d0fc21e8f9315d85cf351540b6517bd6c0de3ee2f884021b",
+    "test_parquet_sha256": "7767d5285d009471175ac7985c60367d82a34088f29c67185da7af2c53b7975d"
+  },
+  "splits": {
+    "fit_count": 90000,
+    "fit_real": 45000,
+    "fit_synthetic": 45000,
+    "fresh_holdout_count": 10000,
+    "fresh_holdout_real": 5000,
+    "fresh_holdout_synthetic": 5000,
+    "official_test_count": 20000,
+    "official_test_real": 10000,
+    "official_test_synthetic": 10000,
+    "reconstructed_v08_development_count": 20000
+  },
+  "model": {
+    "name": "mflab_cifake_hgb_calibrated_v1",
+    "estimator": "CalibratedClassifierCV(HistGradientBoostingClassifier, sigmoid, cv=5)",
+    "feature_bank": "synthetic_handcrafted_v2",
+    "feature_count": 73,
+    "decision_threshold": 0.5,
+    "calibrated": true,
+    "validated": true,
+    "model_sha256": "0b0e9fce64120990e56a282fbd893579fe7adb5e75d996da8428186bfcab9836",
+    "sklearn_version": "1.8.0"
+  },
+  "primary_fresh_holdout": {
+    "status": "primary",
+    "metrics": {
+      "n": 10000,
+      "accuracy": 0.9242,
+      "balanced_accuracy": 0.9242,
+      "precision": 0.9225099601593626,
+      "recall_sensitivity": 0.9262,
+      "specificity": 0.9222,
+      "false_positive_rate": 0.0778,
+      "f1": 0.9243512974051896,
+      "confusion_matrix": {
+        "tn": 4611,
+        "fp": 389,
+        "fn": 369,
+        "tp": 4631
+      },
+      "roc_auc": 0.97839588,
+      "pr_auc": 0.9786646164197925,
+      "brier_score": 0.05619094078584649,
+      "accuracy_ci95_wilson": [
+        0.9188479563287247,
+        0.9292262594535933
+      ],
+      "sensitivity_ci95_wilson": [
+        0.9186214457482019,
+        0.9331241651138314
+      ],
+      "specificity_ci95_wilson": [
+        0.9144471825113035,
+        0.9293045699662904
+      ],
+      "false_positive_rate_ci95_wilson": [
+        0.07069543003370962,
+        0.08555281748869661
+      ]
+    }
+  },
+  "secondary_official_test": {
+    "status": "secondary_previously_inspected_during_v08_development",
+    "metrics": {
+      "n": 20000,
+      "accuracy": 0.92375,
+      "balanced_accuracy": 0.9237500000000001,
+      "precision": 0.9209297705373994,
+      "recall_sensitivity": 0.9271,
+      "specificity": 0.9204,
+      "false_positive_rate": 0.0796,
+      "f1": 0.9240045846414512,
+      "confusion_matrix": {
+        "tn": 9204,
+        "fp": 796,
+        "fn": 729,
+        "tp": 9271
+      },
+      "roc_auc": 0.9791804700000002,
+      "pr_auc": 0.9794652969385571,
+      "brier_score": 0.05577817811673828,
+      "accuracy_ci95_wilson": [
+        0.9199899209302786,
+        0.9273473285121725
+      ],
+      "sensitivity_ci95_wilson": [
+        0.9218389702315697,
+        0.9320330183601984
+      ],
+      "specificity_ci95_wilson": [
+        0.9149320375433965,
+        0.9255450966265386
+      ],
+      "false_positive_rate_ci95_wilson": [
+        0.07445490337346136,
+        0.08506796245660353
+      ]
+    }
+  },
+  "ablations_primary_holdout": {
+    "without_autogan": {
+      "feature_count": 48,
+      "metrics": {
+        "n": 10000,
+        "accuracy": 0.9177,
+        "balanced_accuracy": 0.9177,
+        "precision": 0.9159529974108743,
+        "recall_sensitivity": 0.9198,
+        "specificity": 0.9156,
+        "false_positive_rate": 0.0844,
+        "f1": 0.917872467817583,
+        "confusion_matrix": {
+          "tn": 4578,
+          "fp": 422,
+          "fn": 401,
+          "tp": 4599
+        },
+        "roc_auc": 0.9766688000000001,
+        "pr_auc": 0.9768483156053085,
+        "brier_score": 0.0590661615359381,
+        "accuracy_ci95_wilson": [
+          0.9121518529121501,
+          0.9229273548489866
+        ],
+        "sensitivity_ci95_wilson": [
+          0.91194541020641,
+          0.9270100272405202
+        ],
+        "specificity_ci95_wilson": [
+          0.9075720375618348,
+          0.9229898485814338
+        ],
+        "false_positive_rate_ci95_wilson": [
+          0.07701015141856624,
+          0.09242796243816526
+        ]
+      }
+    },
+    "autogan_only": {
+      "feature_count": 25,
+      "metrics": {
+        "n": 10000,
+        "accuracy": 0.751,
+        "balanced_accuracy": 0.751,
+        "precision": 0.7562270314414047,
+        "recall_sensitivity": 0.7408,
+        "specificity": 0.7612,
+        "false_positive_rate": 0.2388,
+        "f1": 0.748434027076177,
+        "confusion_matrix": {
+          "tn": 3806,
+          "fp": 1194,
+          "fn": 1296,
+          "tp": 3704
+        },
+        "roc_auc": 0.8314026400000001,
+        "pr_auc": 0.8324028155509648,
+        "brier_score": 0.1675309689401322,
+        "accuracy_ci95_wilson": [
+          0.742429148808292,
+          0.7593780840096284
+        ],
+        "sensitivity_ci95_wilson": [
+          0.7284724548202246,
+          0.752757819923036
+        ],
+        "specificity_ci95_wilson": [
+          0.7491847018974644,
+          0.7728142506064377
+        ],
+        "false_positive_rate_ci95_wilson": [
+          0.22718574939356237,
+          0.2508152981025356
+        ]
+      }
+    }
+  },
+  "forensic_policy": {
+    "automatic_label_is_evidentiary_conclusion": false,
+    "default_validated_for_arbitrary_input": false,
+    "domain_confirmation_env": "MFLAB_SYNTHETIC_MODEL_DOMAIN_CONFIRMED=1"
+  },
+  "limitations": [
+    "Validation is in-domain for CIFAKE only.",
+    "No cross-generator or cross-family validity is established by this experiment.",
+    "CIFAKE resolution is 32x32 and does not represent arbitrary high-resolution forensic evidence.",
+    "The official CIFAKE test set is reported secondarily because it was already inspected during v0.8 development.",
+    "The machine real/synthetic label remains separate from evidentiary_conclusion."
+  ]
+}

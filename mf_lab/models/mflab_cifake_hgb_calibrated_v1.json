@@ -1,0 +1,23 @@
+{
+  "model_name": "mflab_cifake_hgb_calibrated_v1",
+  "sha256": "0b0e9fce64120990e56a282fbd893579fe7adb5e75d996da8428186bfcab9836",
+  "feature_bank": "synthetic_handcrafted_v2",
+  "feature_count": 73,
+  "decision_threshold": 0.5,
+  "positive_class": "synthetic",
+  "negative_class": "real",
+  "calibrated": true,
+  "validated": true,
+  "validation_domain": {
+    "dataset": "CIFAKE",
+    "real_source": "CIFAR-10",
+    "synthetic_source": "Stable Diffusion v1.4",
+    "resolution": [
+      32,
+      32
+    ],
+    "domain_match_rule": "examiner confirmation required; resolution alone is not sufficient"
+  },
+  "validation_report": "validation/scientific/CIFAKE_V09_RESULT.json",
+  "warning": "Validated only within the declared CIFAKE domain. Arbitrary-image classification is screening unless the domain is explicitly confirmed."
+}
