@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import urllib.parse
 from collections import Counter
 from pathlib import Path
 
@@ -31,6 +32,14 @@ def _image_info(path: str) -> dict:
             "bytes": int(len(raw)),
             "sha256": hashlib.sha256(raw).hexdigest(),
         }
+
+
+def _base_source_kind(row: dict) -> str:
+    return str(row.get("source_kind") or "unknown").split(";", 1)[0]
+
+
+def _host(row: dict) -> str:
+    return urllib.parse.urlparse(str(row.get("source_url") or "")).netloc or "(none)"
 
 
 def main() -> int:
@@ -103,29 +112,73 @@ def main() -> int:
         writer.writerows(rows)
 
     acquisition = sa.materialize_plan(plan_path, images, materialized_path)
-    verification = validate_materialized_manifest(materialized_path)
-
     with materialized_path.open("r", newline="", encoding="utf-8") as handle:
         materialized = list(csv.DictReader(handle))
 
-    source_counts = Counter(row["source_kind"].split(";", 1)[0] for row in materialized)
+    failed_rows = [
+        row
+        for row in materialized
+        if row.get("acquisition_status") not in {"downloaded", "cached"}
+        or not row.get("local_path")
+    ]
+    failure_diag = {
+        "count": len(failed_rows),
+        "by_source_kind": dict(Counter(_base_source_kind(row) for row in failed_rows)),
+        "by_generator": dict(Counter(str(row.get("generator") or "") for row in failed_rows)),
+        "by_host": dict(Counter(_host(row) for row in failed_rows)),
+        "by_role": dict(Counter(str(row.get("role") or "") for row in failed_rows)),
+        "by_status": dict(Counter(str(row.get("acquisition_status") or "") for row in failed_rows)),
+        "examples": [
+            {
+                "sample_id": row.get("sample_id"),
+                "source_kind": row.get("source_kind"),
+                "generator": row.get("generator"),
+                "role": row.get("role"),
+                "host": _host(row),
+                "status": row.get("acquisition_status"),
+            }
+            for row in failed_rows[:20]
+        ],
+    }
+
+    verification = None
+    verification_error = None
+    try:
+        verification = validate_materialized_manifest(materialized_path)
+    except Exception as exc:
+        verification_error = f"{type(exc).__name__}: {exc}"
+
+    source_counts = Counter(_base_source_kind(row) for row in materialized)
     role_counts = Counter((row["role"], row["label"]) for row in materialized)
     format_counts: Counter[str] = Counter()
     total_bytes = 0
+    sha_postcheck_failures = 0
     for row in materialized:
-        info = _image_info(row["local_path"])
-        if info["sha256"].lower() != row["sha256"].lower():
-            raise RuntimeError(f"post-materialization SHA mismatch: {row['sample_id']}")
+        local_path = str(row.get("local_path") or "")
+        if not local_path or not Path(local_path).is_file():
+            continue
+        info = _image_info(local_path)
+        if not row.get("sha256") or info["sha256"].lower() != row["sha256"].lower():
+            sha_postcheck_failures += 1
         format_counts[info["format"]] += 1
         total_bytes += info["bytes"]
 
+    success = (
+        acquisition["failed_or_unresolved"] == 0
+        and verification is not None
+        and verification.get("complete") is True
+        and verification.get("all_sha256_verified") is True
+        and sha_postcheck_failures == 0
+    )
     report = {
-        "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-REMOTE-SMOKE-0.3",
+        "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-REMOTE-SMOKE-0.4",
         "remote_backend": "dataset_viewer_rows_random_page_scan",
         "rows": len(materialized),
         "scan": {"train": train_scan, "validation": val_scan},
         "acquisition": acquisition,
         "verification": verification,
+        "verification_error": verification_error,
+        "failure_diagnostics": failure_diag,
         "source_kind_counts": dict(source_counts),
         "role_class_counts": {
             f"{role}:{'synthetic' if label == '1' else 'real'}": count
@@ -133,11 +186,12 @@ def main() -> int:
         },
         "image_format_counts": dict(format_counts),
         "bytes_verified": int(total_bytes),
-        "success": True,
+        "sha_postcheck_failures": int(sha_postcheck_failures),
+        "success": bool(success),
     }
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
-    return 0
+    return 0 if success else 2
 
 
 if __name__ == "__main__":
