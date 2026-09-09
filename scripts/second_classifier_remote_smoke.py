@@ -10,6 +10,7 @@ from PIL import Image
 
 from mf_lab.training import selective_acquisition as sa
 from mf_lab.training.selective_embeddings import validate_materialized_manifest
+from mf_lab.training.selective_remote_search import fetch_generator_rows_search
 
 
 def _pick_real(ids: list[str], prefix: str, count: int) -> list[str]:
@@ -44,15 +45,15 @@ def main() -> int:
     rows: list[dict] = []
 
     # 50 synthetic images across an old GAN, a recent proprietary diffusion
-    # generator and a 2024 model family. This validates both train and
-    # validation Dataset Viewer paths without touching the full Parquet shards.
+    # generator and a 2024 model family. Search results are filtered locally by
+    # exact generator equality and must match the official 4000/1000 row count.
     synthetic_specs = [
         ("train", "CycleGAN", "fit", "seen", 20),
         ("validation", "DALL-E 3", "iid_test", "ood-smoke", 15),
         ("validation", "FLUX 1 Schnell", "ood_test", "ood", 15),
     ]
     for split, generator, role, status, count in synthetic_specs:
-        candidates = sa.fetch_generator_rows(split, generator, cache_dir=cache)
+        candidates = fetch_generator_rows_search(split, generator, cache_dir=cache)
         selected = sa._deterministic_take(
             candidates, count, sa.DEFAULT_SEED, "remote-smoke", split, generator
         )
@@ -115,7 +116,8 @@ def main() -> int:
         total_bytes += info["bytes"]
 
     report = {
-        "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-REMOTE-SMOKE-0.1",
+        "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-REMOTE-SMOKE-0.2",
+        "remote_backend": "dataset_viewer_search_exact_generator_gate",
         "rows": len(materialized),
         "acquisition": acquisition,
         "verification": verification,
