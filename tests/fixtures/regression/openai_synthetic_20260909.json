@@ -1,0 +1,34 @@
+{
+  "case_id": "openai-synthetic-20260909",
+  "description": "Controlled synthetic image generated with OpenAI image generation and analyzed by MFLab v0.9.0.",
+  "input_sha256": "ca3885058ed0e2d4e4084c4485cad2cf0286ebeb6ddf977b787ff475a76366bb",
+  "ground_truth": {
+    "class": "synthetic",
+    "source": "controlled_generation"
+  },
+  "observed": {
+    "synthetic_ml": {
+      "status": "success",
+      "model_name": "mflab_cifake_hgb_calibrated_v1",
+      "predicted_label": "real",
+      "score_synthetic": 0.1279246356706563,
+      "calibrated": true,
+      "validated": false,
+      "validated_for_input": false,
+      "validation_scope_status": "unconfirmed"
+    },
+    "synthetic_evidence_fusion": {
+      "status": "success",
+      "convergence_level": "moderate_convergence_for_expert_review",
+      "family_count": 3,
+      "independent_families": ["face", "face_context", "spectral"],
+      "evidentiary_conclusion": "inconclusive"
+    },
+    "c2pa": {
+      "status": "marker_only",
+      "embedded_c2pa_marker_present": true,
+      "producer_hint": "OpenAI Media Service",
+      "cryptographically_validated": false
+    }
+  }
+}

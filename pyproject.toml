@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "media-forensics-lab"
-version = "0.9.0"
+version = "0.9.1"
 description = "Reproducible media-forensics laboratory with classical, synthetic-media, AutoGAN-compatible spectral, visual-artifact and scientifically scoped machine-classification workflows."
 requires-python = ">=3.10"
 dependencies = [
@@ -18,7 +18,8 @@ dependencies = [
   "PyYAML>=6",
   "python-docx>=1.1",
   "Jinja2>=3.1",
-  "Flask>=3.0"
+  "Flask>=3.0",
+  "c2pa-python>=0.37.10,<0.38"
 ]
 
 [project.optional-dependencies]
