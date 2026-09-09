@@ -77,8 +77,8 @@ def main() -> int:
         )
     elif args.command == "extract-embeddings":
         result = extract_verified_materialized_embeddings(
+            args.manifest,
             args.out,
-            manifest_csv=args.manifest,
             backbone=args.backbone,
             batch_size=args.batch_size,
             device=args.device,
