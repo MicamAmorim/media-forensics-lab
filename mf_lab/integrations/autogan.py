@@ -75,6 +75,20 @@ def _normalize_state_dict(state: dict) -> dict:
     return cleaned
 
 
+def _safe_torch_load(torch, checkpoint: Path):
+    """Prefer tensor-only deserialization for externally supplied checkpoints.
+
+    Modern PyTorch supports `weights_only=True`, which avoids general pickle
+    object construction. The fallback exists only for runtimes that predate the
+    argument and should be used solely with checkpoints whose source/hash has
+    been independently trusted and documented.
+    """
+    try:
+        return torch.load(checkpoint, map_location="cpu", weights_only=True)
+    except TypeError:
+        return torch.load(checkpoint, map_location="cpu")
+
+
 @lru_cache(maxsize=4)
 def _load_runtime(checkpoint_str: str, checkpoint_mtime_ns: int):
     # Import lazily so the core MFLab installation remains free of heavy Torch
@@ -86,7 +100,7 @@ def _load_runtime(checkpoint_str: str, checkpoint_mtime_ns: int):
     checkpoint = Path(checkpoint_str)
     model = models.resnet34(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    payload = torch.load(checkpoint, map_location="cpu")
+    payload = _safe_torch_load(torch, checkpoint)
     if isinstance(payload, dict) and isinstance(payload.get("state_dict"), dict):
         state = payload["state_dict"]
     elif isinstance(payload, dict):
