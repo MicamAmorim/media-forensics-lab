@@ -7,7 +7,9 @@ from pathlib import Path
 
 import numpy as np
 
+from mf_lab.analysis.autogan_spectral import autogan_spectral_analysis
 from mf_lab.analysis.synthetic_features import extract_synthetic_feature_bank
+from mf_lab.integrations.autogan import score_autogan_checkpoint
 
 
 @dataclass
@@ -54,14 +56,24 @@ def load_manifest(path: str | Path) -> list[Sample]:
     return rows
 
 
+def _features_for_sample(sample: Sample) -> dict[str, float]:
+    bank = extract_synthetic_feature_bank(sample.path)
+    feats = {k: float(v) for k, v in (bank.get("features") or {}).items()}
+    autogan = autogan_spectral_analysis(sample.path)
+    for key, value in (autogan.get("features") or {}).items():
+        feats[key] = float(value)
+    return feats
+
+
 def _matrix(samples: list[Sample]):
     names = None
     X = []
     for s in samples:
-        bank = extract_synthetic_feature_bank(s.path)
-        feats = bank["features"]
+        feats = _features_for_sample(s)
         if names is None:
             names = sorted(feats)
+        if sorted(feats) != names:
+            raise RuntimeError(f"feature schema mismatch while reading {s.path}")
         X.append([float(feats[n]) for n in names])
     return np.asarray(X, dtype=float), np.asarray([s.label for s in samples], dtype=int), names or []
 
@@ -159,6 +171,54 @@ def _fit_selected(estimator, X, y):
     return fitted, False
 
 
+def _evaluate_autogan_checkpoint(samples: list[Sample]) -> dict:
+    """Evaluate the optional fixed AutoGAN-compatible checkpoint on the final test split."""
+    if not samples:
+        return {"status": "not_available", "reason": "empty test split"}
+    rows = []
+    for sample in samples:
+        result = score_autogan_checkpoint(sample.path)
+        if result.get("status") != "success":
+            return {
+                "status": result.get("status", "not_available"),
+                "reason": result.get("reason", "AutoGAN checkpoint not available"),
+                "validated": False,
+            }
+        rows.append(result)
+
+    y = np.asarray([s.label for s in samples], dtype=int)
+    scores = np.asarray([float(r["score_synthetic"]) for r in rows], dtype=float)
+    pred = (scores >= 0.5).astype(int)
+    result = {
+        "status": "success",
+        "model_name": rows[0].get("model_name"),
+        "feature_mode": rows[0].get("feature_mode"),
+        "validated": bool(all(r.get("validated") is True for r in rows)),
+        "calibrated": bool(all(r.get("calibrated") is True for r in rows)),
+        "metrics": _metrics(y, pred, scores),
+        "by_generator": {},
+        "by_transform": {},
+        "score_interpretation": "Fixed detector score; not a posterior probability unless calibration metadata is independently supported.",
+    }
+
+    synthetic_generators = sorted({s.generator for s in samples if s.label == 1})
+    for generator in synthetic_generators:
+        idx = [i for i, s in enumerate(samples) if s.label == 0 or (s.label == 1 and s.generator == generator)]
+        yy, pp, ss = y[idx], pred[idx], scores[idx]
+        if len(np.unique(yy)) == 2:
+            result["by_generator"][generator] = _metrics(yy, pp, ss)
+
+    for transform in sorted({s.transform for s in samples}):
+        idx = [i for i, s in enumerate(samples) if s.transform == transform]
+        yy, pp, ss = y[idx], pred[idx], scores[idx]
+        result["by_transform"][transform] = (
+            _metrics(yy, pp, ss)
+            if len(np.unique(yy)) == 2
+            else {"n": len(idx), "note": "single-class subgroup"}
+        )
+    return result
+
+
 def run_benchmark(
     manifest: str | Path,
     out: str | Path,
@@ -170,6 +230,9 @@ def run_benchmark(
 
     Model selection never uses the final test set: an explicit validation split is
     preferred; otherwise stratified cross-validation is performed on training data.
+    AutoGAN-compatible spectral descriptors are included in the handcrafted feature
+    matrix, while an explicitly configured AutoGAN checkpoint is evaluated as a
+    separate fixed detector on the untouched final test split.
     """
     from sklearn.base import clone
     import joblib
@@ -259,8 +322,12 @@ def run_benchmark(
             s = est.predict_proba(xb)[:, 1] if hasattr(est, "predict_proba") else None
             logo[held] = _metrics(yb, p, s)
 
+    autogan_names = [n for n in names if n.startswith("autogan_")]
+    base_names = [n for n in names if not n.startswith("autogan_")]
+    autogan_checkpoint = _evaluate_autogan_checkpoint(test)
+
     result = {
-        "protocol": "MFLAB-SCI-SYNTH-0.2",
+        "protocol": "MFLAB-SCI-SYNTH-0.3",
         "manifest": str(manifest),
         "sample_count": len(samples),
         "train_count": len(train),
@@ -268,6 +335,11 @@ def run_benchmark(
         "test_count": len(test),
         "feature_count": len(names),
         "feature_names": names,
+        "feature_families": {
+            "mflab_base_feature_count": len(base_names),
+            "autogan_spectral_feature_count": len(autogan_names),
+            "autogan_spectral_feature_names": autogan_names,
+        },
         "model_selection_source": "validation" if validation else "stratified_cross_validation_on_train",
         "selection_balanced_accuracy": selection_scores,
         "selected_model": best_name,
@@ -277,7 +349,11 @@ def run_benchmark(
         "by_generator": by_generator,
         "by_transform": by_transform,
         "leave_one_generator_out": logo,
-        "interpretation": "Scientific benchmark metrics estimate performance only for the declared dataset/splits. They do not establish universal forensic validity.",
+        "autogan_checkpoint_evaluation": autogan_checkpoint,
+        "interpretation": (
+            "Scientific benchmark metrics estimate performance only for the declared dataset/splits. AutoGAN-compatible features target GAN upsampling artifacts; "
+            "performance must be reported separately for GAN and diffusion/cross-family conditions. No result establishes universal forensic validity."
+        ),
     }
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
