@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+from functools import lru_cache
 from pathlib import Path
 
 import cv2
@@ -56,7 +58,6 @@ def _band_mask(size: int, mode: str) -> np.ndarray:
         inner_lo, inner_hi = 57, 177
         outer_lo, outer_hi = 21, 203
     else:
-        # Relative fallback for tests/future experimentation.
         inner_lo, inner_hi = int(round(size * 57 / 224)), int(round(size * 177 / 224))
         outer_lo, outer_hi = int(round(size * 21 / 224)), int(round(size * 203 / 224))
 
@@ -72,6 +73,22 @@ def _band_mask(size: int, mode: str) -> np.ndarray:
     return mask
 
 
+def _full_spectral_tensor(path: str | Path) -> np.ndarray:
+    rgb = _prepare_rgb(path)
+    return np.stack([_normalize_log_spectrum(rgb[:, :, i]) for i in range(3)], axis=0)
+
+
+def _apply_mode(full: np.ndarray, mode: str) -> np.ndarray:
+    if mode not in AUTOGAN_MODES:
+        raise ValueError(f"unsupported AutoGAN spectral mode: {mode}")
+    channels = []
+    mask = _band_mask(full.shape[1], mode)
+    for idx in range(3):
+        shifted = np.fft.fftshift(full[idx]) * mask
+        channels.append(np.fft.ifftshift(shifted).astype(np.float32))
+    return np.stack(channels, axis=0)
+
+
 def autogan_spectral_tensor(path: str | Path, mode: str = "full") -> np.ndarray:
     """Return the clean-room AutoGAN-compatible spectral tensor [3,224,224].
 
@@ -80,14 +97,7 @@ def autogan_spectral_tensor(path: str | Path, mode: str = "full") -> np.ndarray:
     Band selection is applied in the centered frequency plane and the tensor is
     returned in the unshifted orientation expected by the original classifier.
     """
-    rgb = _prepare_rgb(path)
-    channels = []
-    for idx in range(3):
-        full = _normalize_log_spectrum(rgb[:, :, idx])
-        shifted = np.fft.fftshift(full)
-        shifted = shifted * _band_mask(shifted.shape[0], mode)
-        channels.append(np.fft.ifftshift(shifted).astype(np.float32))
-    return np.stack(channels, axis=0)
+    return _apply_mode(_full_spectral_tensor(path), mode)
 
 
 def autogan_visual_spectrum(path: str | Path, mode: str = "full") -> np.ndarray:
@@ -131,20 +141,12 @@ def _quadrant_replication_score(centered: np.ndarray) -> float:
     return float(np.mean(scores)) if scores else 0.0
 
 
-def autogan_spectral_analysis(path: str | Path) -> dict:
-    """Descriptive GAN-upsampling spectral analysis inspired by AutoGAN.
-
-    This method deliberately does not convert spectral descriptors into a
-    fake/real decision. The original AutoGAN contribution uses a learned
-    spectrum classifier; classification is handled separately by the optional
-    integration adapter and must retain its own validation metadata.
-    """
-    full = autogan_spectral_tensor(path, mode="full")
+def _compute_analysis(path_str: str) -> dict:
+    full = _full_spectral_tensor(path_str)
     features: dict[str, float] = {}
-
     band_energy: dict[str, float] = {}
     for mode in AUTOGAN_MODES:
-        tensor = autogan_spectral_tensor(path, mode=mode)
+        tensor = _apply_mode(full, mode)
         abs_tensor = np.abs(tensor)
         band_energy[mode] = float(np.mean(abs_tensor))
         features[f"autogan_{mode}_mean_abs"] = band_energy[mode]
@@ -165,8 +167,6 @@ def autogan_spectral_analysis(path: str | Path) -> dict:
     features["autogan_replication_lag_y"] = float(lag_y)
     features["autogan_quadrant_replication_score"] = _quadrant_replication_score(centered_mean)
 
-    # Per-channel descriptive summaries retain information useful for later ML
-    # without asserting a universal engineering threshold.
     for idx, name in enumerate(("r", "g", "b")):
         centered = np.fft.fftshift(full[idx])
         features[f"autogan_{name}_mean"] = float(np.mean(centered))
@@ -191,3 +191,19 @@ def autogan_spectral_analysis(path: str | Path) -> dict:
         "method_scope": "Artifacts associated with GAN upsampling pipelines; absence does not exclude GAN generation and does not address diffusion generators in general.",
         "warning": "AutoGAN-compatible spectral descriptors are explanatory features, not a universal AI detector or posterior probability.",
     }
+
+
+@lru_cache(maxsize=512)
+def _cached_analysis(path_str: str, mtime_ns: int, size_bytes: int) -> dict:
+    return _compute_analysis(path_str)
+
+
+def autogan_spectral_analysis(path: str | Path) -> dict:
+    """Descriptive GAN-upsampling spectral analysis inspired by AutoGAN.
+
+    Cache identity includes file path, size and mtime, preventing stale reuse when
+    an evidence file at the same path changes during a long benchmark session.
+    """
+    p = Path(path).resolve()
+    stat = p.stat()
+    return copy.deepcopy(_cached_analysis(str(p), stat.st_mtime_ns, stat.st_size))
