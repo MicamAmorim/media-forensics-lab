@@ -72,6 +72,61 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  convergence-benchmark:
+    name: convergence-benchmark
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+
+      - name: Build controlled demo fixtures
+        run: python scripts/build_demo_dataset.py
+
+      - name: Run convergence benchmark
+        run: mflab benchmark-convergence --out validation/scientific/convergence_benchmark.json
+
+      - name: Validate benchmark schema without tuning thresholds
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('validation/scientific/convergence_benchmark.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['protocol'] == 'MFLAB-CONVERGENCE-BENCH-0.1'
+          assert data['sample_count'] == 8
+          assert data['forensic_validation_claim'] is False
+          for key in ('fusion_metrics', 'protocol_metrics'):
+              metrics = data[key]
+              assert metrics['positive_count'] > 0
+              assert metrics['negative_count'] > 0
+              assert set(metrics['confusion_matrix']) == {'tn', 'fp', 'fn', 'tp'}
+              for name in ('sensitivity', 'specificity', 'false_positive_rate', 'false_negative_rate'):
+                  assert metrics[name] is not None
+          PY
+
+      - name: Upload convergence benchmark
+        uses: actions/upload-artifact@v4
+        with:
+          name: convergence-benchmark
+          path: validation/scientific/convergence_benchmark.json
+          if-no-files-found: error
+          retention-days: 30
+
   package:
     name: package-smoke
     needs: test
@@ -110,13 +165,15 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [test, package]
+    needs: [test, convergence-benchmark, package]
     runs-on: ubuntu-latest
     steps:
       - name: Require every CI stage to pass
         shell: bash
         run: |
           echo "matrix=${{ needs.test.result }}"
+          echo "convergence=${{ needs.convergence-benchmark.result }}"
           echo "package=${{ needs.package.result }}"
           test "${{ needs.test.result }}" = "success"
+          test "${{ needs.convergence-benchmark.result }}" = "success"
           test "${{ needs.package.result }}" = "success"

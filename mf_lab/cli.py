@@ -43,6 +43,18 @@ def main():
     p.add_argument("--cross-generator", action="store_true", help="Run leave-one-generator-out evaluation when manifest supports it")
     p.add_argument("--seed", type=int, default=42)
 
+    p = sp.add_parser(
+        "benchmark-convergence",
+        help="Measure review-escalation sensitivity/specificity on labeled media without tuning thresholds",
+    )
+    p.add_argument(
+        "--manifest",
+        default=None,
+        help="Optional CSV with path,expected_synthetic and optional case_id,source columns; defaults to dataset/demo",
+    )
+    p.add_argument("--dataset", default=None, help="Optional dataset/demo-compatible directory when no manifest is supplied")
+    p.add_argument("--out", default="validation/scientific/convergence_benchmark.json")
+
     p = sp.add_parser("web", help="Launch the local interactive HTML forensic report")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
@@ -80,6 +92,21 @@ def main():
             "selected_model": result["selected_model"],
             "metrics": result["selected_model_metrics"],
             "autogan_checkpoint": result.get("autogan_checkpoint_evaluation", {}).get("status"),
+        }, indent=2, ensure_ascii=False))
+        print(f"benchmark_report={a.out}")
+    elif a.cmd == "benchmark-convergence":
+        from mf_lab.benchmark.convergence import run_convergence_benchmark
+        result = run_convergence_benchmark(
+            dataset_dir=a.dataset,
+            manifest_path=a.manifest,
+            out_path=a.out,
+        )
+        print(json.dumps({
+            "protocol": result["protocol"],
+            "sample_count": result["sample_count"],
+            "fusion_metrics": result["fusion_metrics"],
+            "protocol_metrics": result["protocol_metrics"],
+            "forensic_validation_claim": result["forensic_validation_claim"],
         }, indent=2, ensure_ascii=False))
         print(f"benchmark_report={a.out}")
     elif a.cmd == "web":
