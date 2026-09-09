@@ -1,0 +1,65 @@
+name: Second Classifier Remote Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/second-classifier-remote-smoke.yml'
+      - 'mf_lab/training/selective_acquisition.py'
+      - 'mf_lab/training/selective_embeddings.py'
+      - 'scripts/second_classifier_remote_smoke.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remote-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal smoke dependencies
+        run: python -m pip install --upgrade pip 'numpy>=1.24' 'Pillow>=10'
+
+      - name: Run 100-image remote acquisition smoke
+        env:
+          PYTHONPATH: .
+        run: python scripts/second_classifier_remote_smoke.py
+
+      - name: Validate smoke report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('work/second_classifier/remote-smoke/remote-smoke-report.json')
+          data = json.loads(p.read_text())
+          assert data['success'] is True
+          assert data['rows'] == 100
+          assert data['acquisition']['failed_or_unresolved'] == 0
+          assert data['verification']['complete'] is True
+          assert data['verification']['all_sha256_verified'] is True
+          assert data['source_kind_counts'].get('hf_dataset_viewer', 0) == 50
+          assert data['source_kind_counts'].get('coco', 0) == 35
+          assert data['source_kind_counts'].get('laion', 0) == 15
+          print(json.dumps(data, indent=2))
+          PY
+
+      - name: Upload smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-remote-smoke
+          path: |
+            work/second_classifier/remote-smoke/remote-smoke-report.json
+            work/second_classifier/remote-smoke/materialized.csv
+            work/second_classifier/remote-smoke/materialized.csv.summary.json
+            work/second_classifier/remote-smoke/plan.csv
+          if-no-files-found: error
+          retention-days: 14
