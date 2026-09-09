@@ -49,7 +49,6 @@ def _load_selected(parquet_path: str | Path, per_class: int, seed: int, split_na
 
     table = pq.read_table(parquet_path, columns=["image", "label"])
     labels_original = np.asarray(table["label"].to_numpy(), dtype=np.int8)
-    # CIFAKE mirror: 0=FAKE, 1=REAL. MFLab scientific convention: 1=synthetic, 0=real.
     labels_mflab = (labels_original == 0).astype(np.int8)
     selected = _sample_indices(labels_original, per_class=per_class, seed=seed)
     image_col = table["image"]
@@ -175,7 +174,7 @@ def _augment_intervals(metrics: dict) -> dict:
 
 def _evaluate_family(Xtr, ytr, Xte, yte, feature_names, seed: int):
     from sklearn.base import clone
-    from mf_lab.scientific_validation import _candidate_estimators, _fit_selected, _metrics, _selection_scores
+    from mf_lab.benchmark.synthetic import _candidate_estimators, _fit_selected, _metrics, _selection_scores
 
     estimators = _candidate_estimators(seed)
     selection = _selection_scores(Xtr, ytr, estimators, seed, validation=None)
@@ -205,16 +204,20 @@ def _fmt_pct(x):
     return "—" if x is None else f"{100.0 * float(x):.2f}%"
 
 
+def _fmt_metric(x):
+    return "—" if x is None else f"{float(x):.4f}"
+
+
 def _markdown(result: dict) -> str:
     lines = []
     lines.append("# MFLab v0.8 — validação científica em CIFAKE")
     lines.append("")
     lines.append(f"- **MFLab base SHA:** `{result['mflab_base_sha']}`")
-    lines.append(f"- **Dataset:** CIFAKE (Stable Diffusion v1.4 vs CIFAR-10)")
+    lines.append("- **Dataset:** CIFAKE (Stable Diffusion v1.4 vs CIFAR-10)")
     lines.append(f"- **Treino usado:** {result['dataset']['train_count']:,} imagens")
     lines.append(f"- **Teste oficial usado:** {result['dataset']['test_count']:,} imagens")
     lines.append(f"- **Total processado:** {result['dataset']['total_count']:,} imagens")
-    lines.append(f"- **Resolução:** 32×32 pixels")
+    lines.append("- **Resolução:** 32×32 pixels")
     lines.append("")
     lines.append("## Resultado principal")
     lines.append("")
@@ -224,7 +227,7 @@ def _markdown(result: dict) -> str:
         row = result["ablations"][key]
         m = row["selected_model_metrics"]
         lines.append(
-            f"| {label} | {row['selected_model']} | {_fmt_pct(m.get('accuracy'))} | {_fmt_pct(m.get('recall_sensitivity'))} | {_fmt_pct(m.get('specificity'))} | {_fmt_pct(m.get('false_positive_rate'))} | {m.get('roc_auc') if m.get('roc_auc') is not None else '—':.4f} | {m.get('pr_auc') if m.get('pr_auc') is not None else '—':.4f} |"
+            f"| {label} | {row['selected_model']} | {_fmt_pct(m.get('accuracy'))} | {_fmt_pct(m.get('recall_sensitivity'))} | {_fmt_pct(m.get('specificity'))} | {_fmt_pct(m.get('false_positive_rate'))} | {_fmt_metric(m.get('roc_auc'))} | {_fmt_metric(m.get('pr_auc'))} |"
         )
     lines.append("")
     cm = result["ablations"]["combined"]["selected_model_metrics"]["confusion_matrix"]
