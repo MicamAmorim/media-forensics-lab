@@ -13,6 +13,10 @@ from mf_lab.training.selective_embeddings import (
     extract_verified_materialized_embeddings,
 )
 from mf_lab.training.selective_remote_rows import build_selective_plan_rows
+from mf_lab.training.stable_real_acquisition import (
+    freeze_materialized_corpus,
+    materialize_stable_plan,
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -36,12 +40,36 @@ def parser() -> argparse.ArgumentParser:
 
     mat = sub.add_parser(
         "materialize",
-        help="download only selected images and write SHA-256 materialized manifest",
+        help="legacy direct downloader retained for diagnostics/small experiments",
     )
     mat.add_argument("--plan", required=True)
     mat.add_argument("--output-dir", required=True)
     mat.add_argument("--out", required=True)
     mat.add_argument("--max-samples", type=int)
+
+    stable = sub.add_parser(
+        "materialize-stable",
+        help="stable acquisition: synthetic direct, COCO official ZIP, LAION audited replacements",
+    )
+    stable.add_argument("--plan", required=True)
+    stable.add_argument("--output-dir", required=True)
+    stable.add_argument("--out", required=True)
+    stable.add_argument("--cache-dir", required=True)
+    stable.add_argument("--archive-cache")
+    stable.add_argument("--diagnostics-out")
+    stable.add_argument("--replacement-log-out")
+    stable.add_argument("--max-samples", type=int)
+    stable.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    stable.add_argument("--max-laion-replacements-per-sample", type=int, default=8)
+
+    freeze = sub.add_parser(
+        "freeze-corpus",
+        help="verify every byte/hash and emit a frozen scientific corpus manifest + lock",
+    )
+    freeze.add_argument("--manifest", required=True)
+    freeze.add_argument("--frozen-manifest", required=True)
+    freeze.add_argument("--lock", required=True)
+    freeze.add_argument("--replacement-log")
 
     emb = sub.add_parser(
         "extract-embeddings",
@@ -74,6 +102,26 @@ def main() -> int:
             args.output_dir,
             args.out,
             max_samples=args.max_samples,
+        )
+    elif args.command == "materialize-stable":
+        result = materialize_stable_plan(
+            args.plan,
+            args.output_dir,
+            args.out,
+            cache_dir=args.cache_dir,
+            archive_cache=args.archive_cache,
+            diagnostics_out=args.diagnostics_out,
+            replacement_log_out=args.replacement_log_out,
+            max_samples=args.max_samples,
+            seed=args.seed,
+            max_laion_replacements_per_sample=args.max_laion_replacements_per_sample,
+        )
+    elif args.command == "freeze-corpus":
+        result = freeze_materialized_corpus(
+            args.manifest,
+            args.frozen_manifest,
+            args.lock,
+            replacement_log=args.replacement_log,
         )
     elif args.command == "extract-embeddings":
         result = extract_verified_materialized_embeddings(
