@@ -15,7 +15,7 @@
 - Synthetic-media protocol upgraded to `MFLAB-DF-0.7`.
 - `synthetic_ml` now loads the bundled model by default unless `MFLAB_SYNTHETIC_MODEL` overrides it.
 - A model's bundle-level validation is distinguished from `validated_for_input`; arbitrary evidence is not silently assumed to belong to the validation domain.
-- scikit-learn is constrained to the model-compatible `>=1.8,<1.9` line.
+- scikit-learn is constrained to the Python-3.10-compatible model line `>=1.7.2,<1.8`.
 
 ### Scientific / forensic policy
 - The bundled model is validated only in the declared CIFAKE domain: CIFAR-10 real versus Stable Diffusion v1.4 synthetic at 32×32 pixels.
