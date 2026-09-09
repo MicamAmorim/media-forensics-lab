@@ -17,20 +17,21 @@ from mf_lab.analysis.classical import (
     prnu_screen,
     resampling_analysis,
 )
-from mf_lab.analysis.deepfake import (
-    face_artifact_screen,
-    image_deepfake_protocol,
-    synthetic_spectral_screen,
-    video_deepfake_protocol,
-)
+from mf_lab.analysis.deepfake import face_artifact_screen, synthetic_spectral_screen
+from mf_lab.analysis.deepfake_v2 import image_deepfake_protocol_v2, video_deepfake_protocol_v2
+from mf_lab.analysis.face_context import face_context_consistency
+from mf_lab.analysis.fusion import synthetic_evidence_fusion
 from mf_lab.analysis.image import copy_move_orb, ela, jpeg_dct_periodicity, noise_residual_stats
 from mf_lab.analysis.metadata import image_metadata, video_metadata
-from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies, motion_discontinuity_screen
 from mf_lab.analysis.reference import reference_image_difference, reference_video_sequence_alignment
+from mf_lab.analysis.synthetic_deep import score_synthetic_onnx
+from mf_lab.analysis.synthetic_features import extract_synthetic_feature_bank
+from mf_lab.analysis.synthetic_ml import score_synthetic_ml
+from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies, motion_discontinuity_screen
 from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
 from mf_lab.utils.io import sha256, write_json
-from mf_lab.version import __version__
+from mf_lab.version import current_version
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp", ".heic", ".heif"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mts", ".m2ts"}
@@ -48,13 +49,18 @@ METHODS = {
     "jpeg_quantization": {"refs": ["lukas_fridrich_2003"], "screening_only": True},
     "jpeg_dct": {"refs": ["lukas_fridrich_2003"], "screening_only": True},
     "copy_move_orb": {"refs": ["fridrich_soukal_lukas_2003"], "screening_only": True},
-    "frequency": {"refs": ["verdoliva_2020"], "screening_only": True},
+    "frequency": {"refs": ["verdoliva_2020", "durall_2020"], "screening_only": True},
     "resampling": {"refs": ["popescu_farid_2005"], "screening_only": True},
     "steganography_lsb": {"refs": ["fridrich_steganography_2010"], "screening_only": True},
     "prnu_screen": {"refs": ["lukas_fridrich_goljan_2005"], "screening_only": True},
     "face_artifacts": {"refs": ["verdoliva_2020", "faceforensics_2019"], "screening_only": True},
+    "face_context_consistency": {"refs": ["verdoliva_2020", "faceforensics_2019"], "screening_only": True},
     "synthetic_spectral": {"refs": ["verdoliva_2020", "durall_2020"], "screening_only": True},
-    "deepfake_protocol": {"refs": ["verdoliva_2020", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020"]},
+    "synthetic_feature_bank": {"refs": ["verdoliva_2020", "durall_2020", "cifake_2023"], "screening_only": True},
+    "synthetic_ml": {"refs": ["cifake_2023", "deepfakebench_2023"], "model_based": True},
+    "synthetic_deep": {"refs": ["deepfakebench_2023", "faceforensics_2019", "celebdf_2020"], "model_based": True},
+    "synthetic_evidence_fusion": {"refs": ["verdoliva_2020", "deepfakebench_2023"], "screening_only": True},
+    "deepfake_protocol": {"refs": ["verdoliva_2020", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020", "durall_2020"]},
     "video_timing": {"refs": ["swgde_video_auth", "swgde_ffmpeg"]},
     "video_duplicates": {"refs": ["swgde_video_auth"], "screening_only": True},
     "video_transition_anomalies": {"refs": ["swgde_video_auth"], "screening_only": True},
@@ -67,8 +73,8 @@ METHODS = {
 
 PROFILES = {
     "quick": "Integrity/provenance + metadata + compact classical/deepfake screening.",
-    "deepfake": "Full synthetic/deepfake protocol with classical evidence families.",
-    "full": "All native image/video screening methods plus deepfake protocol.",
+    "deepfake": "Full synthetic/deepfake protocol with handcrafted feature bank and optional validated ML/deep models.",
+    "full": "All native image/video screening methods plus synthetic-media protocol.",
 }
 
 
@@ -76,7 +82,7 @@ def _environment() -> dict:
     return {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
-        "mflab_version": __version__,
+        "mflab_version": current_version(),
         "veritas_integration": veritas_status(),
     }
 
@@ -107,7 +113,7 @@ def analyze_file(
     external_models = load_case_external_models(case_dir, path.name) if case_dir else []
 
     report = {
-        "schema_version": "0.4",
+        "schema_version": "0.5",
         "file": str(path),
         "sha256": sha256(path),
         "size_bytes": path.stat().st_size,
@@ -128,7 +134,7 @@ def analyze_file(
         _safe_method(m, "video_motion_discontinuities", motion_discontinuity_screen, path)
         if reference_path is not None:
             _safe_method(m, "reference_video_alignment", reference_video_sequence_alignment, path, reference_path)
-        _safe_method(m, "video_deepfake_protocol", video_deepfake_protocol, path, external_models)
+        _safe_method(m, "video_deepfake_protocol", video_deepfake_protocol_v2, path, external_models)
     elif is_image:
         _safe_method(m, "metadata", image_metadata, path)
         _safe_method(m, "perceptual_hashes", perceptual_hashes, path)
@@ -142,7 +148,11 @@ def analyze_file(
             _safe_method(m, "resampling", resampling_analysis, path)
             _safe_method(m, "prnu_screen", prnu_screen, path)
             _safe_method(m, "face_artifacts", face_artifact_screen, path)
+            _safe_method(m, "face_context_consistency", face_context_consistency, path)
             _safe_method(m, "synthetic_spectral", synthetic_spectral_screen, path)
+            _safe_method(m, "synthetic_feature_bank", extract_synthetic_feature_bank, path)
+            _safe_method(m, "synthetic_ml", score_synthetic_ml, m.get("synthetic_feature_bank", {}))
+            _safe_method(m, "synthetic_deep", score_synthetic_onnx, path)
 
         if ext in {".jpg", ".jpeg"}:
             _safe_method(m, "jpeg_quantization", jpeg_quantization_analysis, path)
@@ -157,15 +167,26 @@ def analyze_file(
         if reference_path is not None:
             _safe_method(m, "reference_image_difference", reference_image_difference, path, reference_path)
 
+        if profile in {"deepfake", "full"}:
+            _safe_method(m, "synthetic_evidence_fusion", synthetic_evidence_fusion, m)
+
         precomputed = {
-            "c2pa": m.get("c2pa"),
-            "noise_map": m.get("noise_map"),
-            "resampling": m.get("resampling"),
-            "prnu_screen": m.get("prnu_screen"),
-            "face_artifacts": m.get("face_artifacts"),
-            "synthetic_spectral": m.get("synthetic_spectral"),
+            k: m.get(k)
+            for k in (
+                "c2pa",
+                "noise_map",
+                "resampling",
+                "prnu_screen",
+                "face_artifacts",
+                "face_context_consistency",
+                "synthetic_spectral",
+                "synthetic_feature_bank",
+                "synthetic_ml",
+                "synthetic_deep",
+                "synthetic_evidence_fusion",
+            )
         }
-        _safe_method(m, "deepfake_protocol", image_deepfake_protocol, path, precomputed, external_models)
+        _safe_method(m, "deepfake_protocol", image_deepfake_protocol_v2, path, precomputed, external_models)
 
         if run_veritas:
             _safe_method(m, "veritas_upstream_crosscheck", run_veritas_all, path)
@@ -200,15 +221,23 @@ def analyze_case(case_dir: str | Path, profile: str = "full", run_veritas: bool 
         if ref_path is not None and not ref_path.exists():
             ref_path = None
         try:
-            reports.append(analyze_file(
-                p, results, profile=profile, case_dir=case, run_veritas=run_veritas, reference_path=ref_path
-            ))
+            reports.append(
+                analyze_file(
+                    p,
+                    results,
+                    profile=profile,
+                    case_dir=case,
+                    run_veritas=run_veritas,
+                    reference_path=ref_path,
+                )
+            )
         except Exception as e:
             write_json(results / (p.name + ".error.json"), {"file": str(p), "error": repr(e)})
+
     write_json(
         case / "report.json",
         {
-            "schema_version": "0.4",
+            "schema_version": "0.5",
             "case_id": case.name,
             "profile": profile,
             "veritas_crosscheck_requested": bool(run_veritas),
