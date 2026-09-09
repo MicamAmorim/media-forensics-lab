@@ -32,6 +32,7 @@ from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
 from mf_lab.utils.io import sha256, write_json
 from mf_lab.version import current_version
+from mf_lab.visual_artifacts import generate_visual_artifacts
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp", ".heic", ".heif"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mts", ".m2ts"}
@@ -79,7 +80,12 @@ PROFILES = {
 
 
 def _environment() -> dict:
-    return {"python": sys.version.split()[0], "platform": platform.platform(), "mflab_version": current_version(), "veritas_integration": veritas_status()}
+    return {
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "mflab_version": current_version(),
+        "veritas_integration": veritas_status(),
+    }
 
 
 def _safe_method(methods: dict, name: str, fn, *args, **kwargs) -> None:
@@ -89,16 +95,28 @@ def _safe_method(methods: dict, name: str, fn, *args, **kwargs) -> None:
         methods[name] = {"status": "error", "error": repr(e)}
 
 
-def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full", case_dir: str | Path | None = None, run_veritas: bool = False, reference_path: str | Path | None = None) -> dict:
+def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
+                 case_dir: str | Path | None = None, run_veritas: bool = False,
+                 reference_path: str | Path | None = None) -> dict:
     if profile not in PROFILES:
         raise ValueError(f"unknown profile: {profile}; choose one of {', '.join(PROFILES)}")
     path = Path(path)
-    out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
     ext = path.suffix.lower()
     is_video = ext in VIDEO_EXTS
     is_image = ext in IMAGE_EXTS or not is_video
     external_models = load_case_external_models(case_dir, path.name) if case_dir else []
-    report = {"schema_version": "0.5", "file": str(path), "sha256": sha256(path), "size_bytes": path.stat().st_size, "analyzed_at": datetime.now(timezone.utc).isoformat(), "profile": profile, "environment": _environment(), "methods": {}}
+    report = {
+        "schema_version": "0.6",
+        "file": str(path),
+        "sha256": sha256(path),
+        "size_bytes": path.stat().st_size,
+        "analyzed_at": datetime.now(timezone.utc).isoformat(),
+        "profile": profile,
+        "environment": _environment(),
+        "methods": {},
+    }
     m = report["methods"]
     m["hash_sha256"] = {"sha256": report["sha256"]}
     _safe_method(m, "c2pa", c2pa_inspect, path)
@@ -141,33 +159,70 @@ def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full", c
             _safe_method(m, "reference_image_difference", reference_image_difference, path, reference_path)
         if profile in {"deepfake", "full"}:
             _safe_method(m, "synthetic_evidence_fusion", synthetic_evidence_fusion, m)
-        precomputed = {k: m.get(k) for k in ("c2pa", "noise_map", "resampling", "prnu_screen", "face_artifacts", "face_context_consistency", "synthetic_spectral", "synthetic_feature_bank", "synthetic_ml", "synthetic_deep", "synthetic_evidence_fusion")}
+        precomputed = {k: m.get(k) for k in (
+            "c2pa", "noise_map", "resampling", "prnu_screen", "face_artifacts",
+            "face_context_consistency", "synthetic_spectral", "synthetic_feature_bank",
+            "synthetic_ml", "synthetic_deep", "synthetic_evidence_fusion",
+        )}
         _safe_method(m, "deepfake_protocol", image_deepfake_protocol_v2, path, precomputed, external_models)
         if run_veritas:
             _safe_method(m, "veritas_upstream_crosscheck", run_veritas_all, path)
 
     report["method_registry"] = {k: METHODS[k] for k in m if k in METHODS}
+    visual_root = Path(case_dir) if case_dir is not None else out
+    try:
+        report["visual_artifacts"] = generate_visual_artifacts(
+            path, visual_root, m, reference_path=reference_path
+        )
+    except Exception as e:
+        report["visual_artifacts"] = {
+            "status": "error",
+            "artifact_count": 0,
+            "items": [],
+            "errors": [{"id": "renderer", "error": repr(e)}],
+            "warning": "Falha na renderização visual não invalida os resultados numéricos já registrados.",
+        }
     write_json(out / (path.name + ".report.json"), report)
     return report
 
 
 def analyze_case(case_dir: str | Path, profile: str = "full", run_veritas: bool = False) -> list[dict]:
     import yaml
-    case = Path(case_dir); original = case / "original"; results = case / "results"; results.mkdir(parents=True, exist_ok=True)
-    case_yaml = case / "case.yaml"; reference_files = {}
+
+    case = Path(case_dir)
+    original = case / "original"
+    results = case / "results"
+    results.mkdir(parents=True, exist_ok=True)
+    (case / "visuals").mkdir(parents=True, exist_ok=True)
+    case_yaml = case / "case.yaml"
+    reference_files = {}
     if case_yaml.exists():
         try:
-            cfg = yaml.safe_load(case_yaml.read_text(encoding="utf-8")) or {}; reference_files = (cfg.get("case") or {}).get("reference_files") or {}
+            cfg = yaml.safe_load(case_yaml.read_text(encoding="utf-8")) or {}
+            reference_files = (cfg.get("case") or {}).get("reference_files") or {}
         except Exception:
             reference_files = {}
     reports = []
     for p in sorted(original.glob("*")):
-        if not p.is_file(): continue
-        ref_name = reference_files.get(p.name); ref_path = original / ref_name if ref_name else None
-        if ref_path is not None and not ref_path.exists(): ref_path = None
+        if not p.is_file():
+            continue
+        ref_name = reference_files.get(p.name)
+        ref_path = original / ref_name if ref_name else None
+        if ref_path is not None and not ref_path.exists():
+            ref_path = None
         try:
-            reports.append(analyze_file(p, results, profile=profile, case_dir=case, run_veritas=run_veritas, reference_path=ref_path))
+            reports.append(analyze_file(
+                p, results, profile=profile, case_dir=case,
+                run_veritas=run_veritas, reference_path=ref_path,
+            ))
         except Exception as e:
             write_json(results / (p.name + ".error.json"), {"file": str(p), "error": repr(e)})
-    write_json(case / "report.json", {"schema_version": "0.5", "case_id": case.name, "profile": profile, "veritas_crosscheck_requested": bool(run_veritas), "reference_files": reference_files, "reports": reports})
+    write_json(case / "report.json", {
+        "schema_version": "0.6",
+        "case_id": case.name,
+        "profile": profile,
+        "veritas_crosscheck_requested": bool(run_veritas),
+        "reference_files": reference_files,
+        "reports": reports,
+    })
     return reports
