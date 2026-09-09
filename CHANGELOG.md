@@ -8,8 +8,9 @@
 - Optional handcrafted ML detector bundle with explicit validation/calibration metadata.
 - Optional ONNX deep-detector adapter without bundled unvalidated weights.
 - Conservative cross-family synthetic evidence convergence summary.
-- Scientific validation layer `MFLAB-SCI-SYNTH-0.1`, separate from regression CI.
-- Scientific benchmark metrics including FPR, specificity, ROC-AUC and PR-AUC, grouped by generator/transform and optional leave-one-generator-out.
+- Scientific validation layer `MFLAB-SCI-SYNTH-0.2`, separate from regression CI.
+- Scientific benchmark metrics including FPR, specificity, ROC-AUC, PR-AUC and Brier score, grouped by generator/transform and optional leave-one-generator-out.
+- Model selection isolated from the final test set through an explicit validation split or stratified cross-validation on training data.
 
 ### Changed
 - Deepfake protocol upgraded to `MFLAB-DF-0.5`.
