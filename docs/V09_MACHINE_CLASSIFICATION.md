@@ -8,6 +8,8 @@ O bundle `mflab_cifake_hgb_calibrated_v1.joblib` usa `synthetic_handcrafted_v2` 
 
 A classe positiva é `synthetic`, com limiar padrão 0,5. O score retornado pelo classificador é interpretável como probabilidade calibrada **somente dentro do domínio de calibração/validação documentado**.
 
+O bundle versionado, seus metadados e os artefatos científicos associados são regenerados pelo workflow reprodutível da v0.9; o CI geral permanece uma verificação independente de compatibilidade, testes, ground truth e empacotamento.
+
 ## Domínio validado
 
 - Dataset: CIFAKE.
