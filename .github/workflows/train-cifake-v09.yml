@@ -1,6 +1,14 @@
 name: Train CIFAKE v0.9 bundled model
 
 on:
+  push:
+    branches:
+      - feat/v0.9-cifake-model
+    paths:
+      - requirements.txt
+      - pyproject.toml
+      - scripts/cifake_model_training.py
+      - .github/workflows/train-cifake-v09.yml
   workflow_dispatch:
     inputs:
       commit_results:
@@ -111,7 +119,7 @@ jobs:
           print(bundle['model_name'])
           PY
       - name: Commit regenerated model and validation evidence
-        if: ${{ inputs.commit_results }}
+        if: ${{ github.event_name == 'push' || inputs.commit_results }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
