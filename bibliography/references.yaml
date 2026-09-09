@@ -104,6 +104,11 @@ references:
     citation: 'DURALL, R.; KEUPER, M.; KEUPER, J. Watch Your Up-Convolution: CNN Based Generative Deep Neural Networks Are Failing to Reproduce Spectral Distributions. CVPR, 2020.'
     file: papers/Durall_Keuper_Keuper_2020_Spectral_Distributions.txt
     url: https://openaccess.thecvf.com/content_CVPR_2020/html/Durall_Watch_Your_Up-Convolution_CNN_Based_Generative_Deep_Neural_Networks_Are_Failing_CVPR_2020_paper.html
+  autogan_2019:
+    type: paper
+    citation: 'ZHANG, X.; KARAMAN, S.; CHANG, S.-F. Detecting and Simulating Artifacts in GAN Fake Images. IEEE International Workshop on Information Forensics and Security (WIFS), 2019.'
+    file: papers/README_AutoGAN_2019.txt
+    url: https://arxiv.org/abs/1907.06515
   veritas_2025:
     type: software
     citation: ADEEL, R. Veritas - Forensic Image Analysis Toolkit. GitHub, 2025. Software sob licença BSD 3-Clause.
