@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 from flask import Flask, abort, jsonify, render_template, request, send_file, send_from_directory
@@ -59,7 +59,7 @@ def _signal_counts(methods: dict) -> dict[str, int]:
     dct = methods.get("jpeg_dct") or {}
     compression += int(_numeric(dct.get("score"), 0) >= 0.10)
     ghost = methods.get("jpeg_ghost") or {}
-    compression += int(bool(ghost.get("suspicious_qualities") or ghost.get("candidates")))
+    compression += int(bool(ghost.get("suspicious_qualities") or ghost.get("candidates") or ghost.get("quality_sweep")))
     rs = methods.get("resampling") or {}
     resampling += int(rs.get("screening_flag") is True)
     nm = methods.get("noise_map") or {}
@@ -108,6 +108,20 @@ def _method_summary(name: str, result) -> dict:
     return {"name": name, "status": "ok", "summary": text}
 
 
+def _artifact_rows(run_id: str, report: dict) -> list[dict]:
+    rows = []
+    for item in (report.get("visual_artifacts") or {}).get("items") or []:
+        rel = str(item.get("path") or "").replace("\\", "/")
+        if rel.startswith("visuals/"):
+            rel = rel[len("visuals/"):]
+        if not rel:
+            continue
+        row = dict(item)
+        row["url"] = f"/api/run/{run_id}/artifact/{rel}"
+        rows.append(row)
+    return rows
+
+
 def _serialize_report(run_id: str, report: dict) -> dict:
     name = Path(report.get("file", "arquivo")).name
     methods = report.get("methods") or {}
@@ -115,24 +129,41 @@ def _serialize_report(run_id: str, report: dict) -> dict:
     triage = proto.get("triage_assessment", "não informado") if isinstance(proto, dict) else "não informado"
     conclusion = proto.get("evidentiary_conclusion", "inconclusivo") if isinstance(proto, dict) else "inconclusivo"
     signal_counts = _signal_counts(methods)
+    artifacts = _artifact_rows(run_id, report)
     return {
-        "name": name, "sha256": report.get("sha256"), "size_bytes": report.get("size_bytes"),
-        "analyzed_at": report.get("analyzed_at"), "profile": report.get("profile"),
-        "triage_assessment": triage, "evidentiary_conclusion": conclusion,
-        "signal_counts": signal_counts, "signal_total": sum(signal_counts.values()),
+        "name": name,
+        "sha256": report.get("sha256"),
+        "size_bytes": report.get("size_bytes"),
+        "analyzed_at": report.get("analyzed_at"),
+        "profile": report.get("profile"),
+        "triage_assessment": triage,
+        "evidentiary_conclusion": conclusion,
+        "signal_counts": signal_counts,
+        "signal_total": sum(signal_counts.values()),
         "preview_url": f"/api/run/{run_id}/media/{name}",
         "methods": [_method_summary(k, v) for k, v in methods.items()],
+        "artifacts": artifacts,
+        "artifact_count": len(artifacts),
+        "artifact_warning": (report.get("visual_artifacts") or {}).get("warning"),
     }
 
 
 def _write_case_yaml(case_dir: Path, case_id: str) -> None:
     payload = {"case": {
-        "id": case_id, "title": "Análise interativa de mídia digital", "process_number": "", "court": "",
+        "id": case_id,
+        "title": "Análise interativa de mídia digital",
+        "process_number": "",
+        "court": "",
         "expert": {"name": "[NOME DO PERITO]", "qualification": "[QUALIFICAÇÃO]"},
         "scope": "Triagem técnico-forense automatizada de arquivos de mídia, com preservação de hash, métodos de análise nativos do MFLab e ressalva de que sinais automatizados não constituem veredito isolado de autenticidade, manipulação ou geração sintética.",
-        "questions": ["Há sinais técnicos que justifiquem revisão pericial aprofundada?", "Há sinais compatíveis com manipulação local ou mídia sintética?"],
+        "questions": [
+            "Há sinais técnicos que justifiquem revisão pericial aprofundada?",
+            "Há sinais compatíveis com manipulação local ou mídia sintética?",
+        ],
     }}
-    (case_dir / "case.yaml").write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    (case_dir / "case.yaml").write_text(
+        yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
 
 
 def create_app() -> Flask:
@@ -144,7 +175,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return render_template("index.html", profiles=sorted(PROFILES))
+        return render_template("index.html", profiles=sorted(PROFILES), version=current_version())
 
     @app.get("/api/health")
     def health():
@@ -163,7 +194,7 @@ def create_app() -> Flask:
         run_id = "web-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8]
         case_dir = RUN_ROOT / run_id
         original = case_dir / "original"
-        for sub in ("original", "working", "results", "logs", "final"):
+        for sub in ("original", "working", "results", "logs", "final", "visuals"):
             (case_dir / sub).mkdir(parents=True, exist_ok=True)
         _write_case_yaml(case_dir, run_id)
         accepted, rejected = [], []
@@ -187,15 +218,25 @@ def create_app() -> Flask:
         md_path = generate_preliminary_report(case_dir, "md")
         serialized = [_serialize_report(run_id, r) for r in reports]
         return jsonify({
-            "run_id": run_id, "profile": profile, "accepted": accepted, "rejected": rejected, "files": serialized,
+            "run_id": run_id,
+            "profile": profile,
+            "accepted": accepted,
+            "rejected": rejected,
+            "files": serialized,
             "summary": {
-                "files": len(serialized), "screening_signals": sum(x["signal_total"] for x in serialized),
+                "files": len(serialized),
+                "screening_signals": sum(x["signal_total"] for x in serialized),
                 "needs_review": sum(x["triage_assessment"] == "needs_expert_review" for x in serialized),
                 "inconclusive": sum(str(x["evidentiary_conclusion"]).lower() in {"inconclusive", "inconclusivo"} for x in serialized),
+                "visual_artifacts": sum(x["artifact_count"] for x in serialized),
             },
-            "downloads": {"docx": f"/api/run/{run_id}/download/docx", "md": f"/api/run/{run_id}/download/md", "json": f"/api/run/{run_id}/download/json"},
+            "downloads": {
+                "docx": f"/api/run/{run_id}/download/docx",
+                "md": f"/api/run/{run_id}/download/md",
+                "json": f"/api/run/{run_id}/download/json",
+            },
             "generated": {"docx": Path(docx_path).name, "md": Path(md_path).name},
-            "warning": "Os gráficos resumem indicadores de triagem e não representam probabilidade de falsificação, peso de evidência ou conclusão pericial automática.",
+            "warning": "Os gráficos e imagens derivados são instrumentos de inspeção e documentação. Não representam, isoladamente, probabilidade de falsificação, peso de evidência ou conclusão pericial automática.",
         })
 
     def _case_or_404(run_id: str) -> Path:
@@ -208,6 +249,14 @@ def create_app() -> Flask:
     def media(run_id: str, filename: str):
         case_dir = _case_or_404(run_id)
         return send_from_directory(case_dir / "original", secure_filename(Path(filename).name), conditional=True)
+
+    @app.get("/api/run/<run_id>/artifact/<path:filename>")
+    def artifact(run_id: str, filename: str):
+        case_dir = _case_or_404(run_id)
+        posix = PurePosixPath(filename)
+        if posix.is_absolute() or ".." in posix.parts:
+            abort(404)
+        return send_from_directory(case_dir / "visuals", posix.as_posix(), conditional=True)
 
     @app.get("/api/run/<run_id>/download/<kind>")
     def download(run_id: str, kind: str):
