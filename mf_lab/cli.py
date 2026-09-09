@@ -18,12 +18,12 @@ def main():
     p.add_argument("file")
     p.add_argument("--out", default="results")
     p.add_argument("--profile", choices=sorted(PROFILES), default="full")
-    p.add_argument("--veritas", action="store_true", help="Run optional CodeRafay/Veritas checkout as secondary cross-check")
+    p.add_argument("--veritas", action="store_true")
 
     p = sp.add_parser("analyze-case")
     p.add_argument("case_dir")
     p.add_argument("--profile", choices=sorted(PROFILES), default="full")
-    p.add_argument("--veritas", action="store_true", help="Run optional CodeRafay/Veritas checkout as secondary cross-check")
+    p.add_argument("--veritas", action="store_true")
 
     p = sp.add_parser("report")
     p.add_argument("case_dir")
@@ -32,11 +32,18 @@ def main():
     sp.add_parser("integrations", help="Show optional upstream integration status")
 
     p = sp.add_parser("validate-demo", help="Run controlled regression validation against dataset/demo ground truth")
-    p.add_argument("--dataset", default=None, help="Optional demo dataset directory")
+    p.add_argument("--dataset", default=None)
     p.add_argument("--out", default="validation/demo_validation.json")
 
+    p = sp.add_parser("benchmark-synthetic", help="Run scientific synthetic-media validation from an external manifest")
+    p.add_argument("manifest", help="CSV with path,label,split and optional generator,transform columns")
+    p.add_argument("--out", default="validation/scientific/synthetic_benchmark.json")
+    p.add_argument("--model-out", default=None, help="Optional joblib bundle for the selected handcrafted model")
+    p.add_argument("--cross-generator", action="store_true", help="Run leave-one-generator-out evaluation when manifest supports it")
+    p.add_argument("--seed", type=int, default=42)
+
     p = sp.add_parser("web", help="Launch the local interactive HTML forensic report")
-    p.add_argument("--host", default="127.0.0.1", help="Bind address; keep 127.0.0.1 for local-only use")
+    p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--debug", action="store_true")
 
@@ -53,6 +60,22 @@ def main():
         result = validate_demo(a.dataset, a.out)
         print(json.dumps(result["summary"], indent=2, ensure_ascii=False))
         print(f"validation_report={a.out}")
+    elif a.cmd == "benchmark-synthetic":
+        from mf_lab.benchmark.synthetic import run_benchmark
+        result = run_benchmark(
+            a.manifest,
+            a.out,
+            model_out=a.model_out,
+            cross_generator=a.cross_generator,
+            seed=a.seed,
+        )
+        print(json.dumps({
+            "protocol": result["protocol"],
+            "sample_count": result["sample_count"],
+            "selected_model": result["selected_model"],
+            "metrics": result["selected_model_metrics"],
+        }, indent=2, ensure_ascii=False))
+        print(f"benchmark_report={a.out}")
     elif a.cmd == "web":
         from mf_lab.webapp import run_web
         run_web(host=a.host, port=a.port, debug=a.debug)
