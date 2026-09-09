@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 import mf_lab.webapp as webapp
+from mf_lab.version import current_version
 
 
 def _png_bytes():
@@ -22,7 +23,7 @@ def test_web_index_and_health(monkeypatch, tmp_path):
     assert client.get("/").status_code == 200
     health = client.get("/api/health").get_json()
     assert health["status"] == "ok"
-    assert health["version"] == "0.5.0"
+    assert health["version"] == current_version()
 
 
 def test_multi_image_upload_and_download_links(monkeypatch, tmp_path):
