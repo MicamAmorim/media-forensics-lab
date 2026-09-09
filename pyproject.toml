@@ -27,6 +27,12 @@ test = ["pytest>=8"]
 ai = ["datasets>=3", "huggingface_hub>=0.25"]
 deep = ["onnxruntime>=1.17"]
 autogan = ["torch>=2.2", "torchvision>=0.17"]
+second = [
+  "datasets>=3",
+  "huggingface_hub>=0.25",
+  "torch>=2.2",
+  "transformers>=4.45"
+]
 
 [project.scripts]
 mflab = "mf_lab.cli:main"
