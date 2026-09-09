@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "media-forensics-lab"
-version = "0.8.0"
-description = "Reproducible media-forensics laboratory with classical, synthetic-media, AutoGAN-compatible spectral, visual-artifact and scientific validation workflows."
+version = "0.9.0"
+description = "Reproducible media-forensics laboratory with classical, synthetic-media, AutoGAN-compatible spectral, visual-artifact and scientifically scoped machine-classification workflows."
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",
@@ -13,7 +13,7 @@ dependencies = [
   "Pillow>=10",
   "scipy>=1.10",
   "scikit-image>=0.21",
-  "scikit-learn>=1.3",
+  "scikit-learn>=1.8,<1.9",
   "matplotlib>=3.7",
   "PyYAML>=6",
   "python-docx>=1.1",
@@ -35,7 +35,13 @@ include = ["mf_lab*"]
 exclude = ["dataset*", "templates*", "third_party*", "bibliography*", "tests*", "case-*", "benchmark*"]
 
 [tool.setuptools.package-data]
-mf_lab = ["web/templates/*.html", "web/static/*.css", "web/static/*.js"]
+mf_lab = [
+  "web/templates/*.html",
+  "web/static/*.css",
+  "web/static/*.js",
+  "models/*.joblib",
+  "models/*.json"
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
