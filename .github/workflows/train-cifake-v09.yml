@@ -1,9 +1,13 @@
 name: Train CIFAKE v0.9 bundled model
 
 on:
-  push:
-    branches:
-      - feat/v0.9-cifake-model
+  workflow_dispatch:
+    inputs:
+      commit_results:
+        description: "Commit regenerated model/results back to the selected branch"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -18,7 +22,6 @@ env:
 
 jobs:
   extract-features:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -58,7 +61,6 @@ jobs:
           retention-days: 7
 
   train-export:
-    if: github.actor != 'github-actions[bot]'
     needs: extract-features
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -108,13 +110,15 @@ jobs:
           assert bundle['validation']['fresh_holdout_count'] == 10000
           print(bundle['model_name'])
           PY
-      - name: Commit generated model and validation evidence
+      - name: Commit regenerated model and validation evidence
+        if: ${{ inputs.commit_results }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md mf_lab/models docs/assets/validation validation/scientific
           git status --short
-          git commit -m "validation: train and export CIFAKE v0.9 model [skip cifake-train]"
+          git diff --cached --quiet && exit 0
+          git commit -m "validation: regenerate CIFAKE v0.9 model"
           git push origin HEAD:${GITHUB_REF_NAME}
       - uses: actions/upload-artifact@v4
         with:
