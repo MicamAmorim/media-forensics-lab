@@ -62,7 +62,7 @@ jobs:
             --test-parquet /tmp/cifake-data/test.parquet \
             --out validation/cifake-v09-features-${{ matrix.shard }}.npz \
             --shard ${{ matrix.shard }} --shards 4 --workers 2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cifake-v09-features-${{ matrix.shard }}
           path: validation/cifake-v09-features-${{ matrix.shard }}.npz
@@ -130,7 +130,7 @@ jobs:
           git fetch origin "$GITHUB_REF_NAME"
           git rebase "origin/$GITHUB_REF_NAME"
           git push origin HEAD:${GITHUB_REF_NAME}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mflab-cifake-v09-model-and-validation
           path: |
