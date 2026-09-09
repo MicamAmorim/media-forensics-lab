@@ -168,9 +168,22 @@ def _validation_summary(
         embedded_value = bool(embedded)
         manifest_location = "embedded" if embedded_value else ("remote_or_external" if manifest_present else "none")
 
+    if failure_codes:
+        diagnostic_reason = (
+            f"validation_state={state or 'unknown'}; trust_status={trust_status}; "
+            f"failures={failure_codes[:8]}"
+        )
+    elif status == "validated":
+        diagnostic_reason = f"validation_state={state or 'unknown'}; trust_status={trust_status}; no_validation_failures"
+    elif manifest_present:
+        diagnostic_reason = f"validation_state={state or 'unknown'}; trust_status={trust_status}; manifest_present_but_not_validated"
+    else:
+        diagnostic_reason = "no_active_manifest"
+
     return {
         "status": status,
         "tool": tool,
+        "reason": diagnostic_reason,
         "manifest_present": manifest_present,
         "embedded_c2pa_marker_present": manifest_present,
         "active_manifest": active_label,
