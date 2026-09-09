@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.9.0 - 2026-09-09
+
+### Added
+- Bundled calibrated classifier `mflab_cifake_hgb_calibrated_v1` using the `synthetic_handcrafted_v2` feature bank.
+- Reproducible CIFAKE training/export workflow with full feature extraction, model export, JSON/Markdown validation report and validation plots.
+- Explicit `machine_assessment` object in `MFLAB-DF-0.7`, separating the computational `real`/`synthetic` vote from the forensic evidentiary conclusion.
+- Interactive-report display of the automatic class label, synthetic score, model name and validation-scope status.
+- Package-data support for the bundled `.joblib` model and its validation metadata.
+- Fresh-holdout protocol that reconstructs the v0.8 development subset and reserves a disjoint holdout from its complement before the v0.9 model is evaluated.
+
+### Changed
+- Project version bumped to `0.9.0`.
+- Synthetic-media protocol upgraded to `MFLAB-DF-0.7`.
+- `synthetic_ml` now loads the bundled model by default unless `MFLAB_SYNTHETIC_MODEL` overrides it.
+- A model's bundle-level validation is distinguished from `validated_for_input`; arbitrary evidence is not silently assumed to belong to the validation domain.
+- scikit-learn is constrained to the model-compatible `>=1.8,<1.9` line.
+
+### Scientific / forensic policy
+- The bundled model is validated only in the declared CIFAKE domain: CIFAR-10 real versus Stable Diffusion v1.4 synthetic at 32×32 pixels.
+- The official CIFAKE test set is retained as a secondary result because it was already inspected during v0.8 development; the primary v0.9 estimate uses a fresh disjoint holdout from the CIFAKE training pool.
+- For arbitrary case images, the automatic label remains screening unless the examiner explicitly confirms domain applicability using `MFLAB_SYNTHETIC_MODEL_DOMAIN_CONFIRMED=1`.
+- `machine_assessment.label` is never promoted automatically to `evidentiary_conclusion`; the latter remains `inconclusive` absent documented expert convergence.
+
 ## 0.8.0 - 2026-09-08
 
 ### Added
