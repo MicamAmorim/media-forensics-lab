@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.8.0 - 2026-09-08
+
+### Added
+- Clean-room AutoGAN-compatible spectral preprocessing for GAN upsampling artifact analysis.
+- Per-channel FFT log-magnitude normalization using P5/P95 and `full`, `low`, `mid`, `high` frequency partitions compatible with the WIFS 2019 method.
+- Descriptive AutoGAN feature family: band energy fractions, profile autocorrelation peaks, lag descriptors, quadrant-replication correlation and per-channel spectral statistics.
+- Optional ResNet34 AutoGAN checkpoint adapter using `MFLAB_AUTOGAN_CHECKPOINT`, with lazy Torch/Torchvision loading and SHA-256 checkpoint provenance.
+- Optional checkpoint metadata via sidecar JSON / `MFLAB_AUTOGAN_METADATA` for explicit calibration and validation state.
+- AutoGAN visual artifacts (`autogan_fft_full/low/mid/high` and `autogan_spectral_profile`) integrated into the existing gallery and report appendix without redesigning the site.
+- Scientific benchmark support for AutoGAN-compatible features and optional fixed-checkpoint evaluation on the untouched final test split.
+- Tests covering spectral geometry, band partitioning, feature integration, optional checkpoint behavior, fusion policy and visual-artifact generation.
+- Documentation `docs/AUTOGAN_INTEGRATION.md` and WIFS 2019 bibliography entry.
+
+### Changed
+- Project version bumped to `0.8.0`.
+- Report schema bumped to `0.7`.
+- `synthetic_handcrafted_v2` now includes AutoGAN-compatible spectral features.
+- Synthetic-media protocol upgraded to `MFLAB-DF-0.6`.
+- Scientific validation protocol upgraded to `MFLAB-SCI-SYNTH-0.3`.
+- `mflab integrations` now reports AutoGAN checkpoint configuration status.
+- Optional dependency group `autogan` adds modern Torch/Torchvision without changing core CI dependencies.
+
+### Forensic policy
+- AutoGAN is treated as a GAN-upsampling artifact family, not a universal AI detector.
+- Descriptive AutoGAN features do not create an evidence family by themselves.
+- Unvalidated checkpoints remain screening observations only.
+- Negative AutoGAN results do not exclude GAN generation, diffusion models or other synthetic-media families.
+- The canonical GT regression gate remains 100% mandatory and separate from population-level scientific validation.
+
 ## 0.7.0 - 2026-09-08
 
 ### Added
