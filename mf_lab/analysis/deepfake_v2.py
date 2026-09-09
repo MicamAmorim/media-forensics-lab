@@ -20,7 +20,21 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
             "calibrated": False,
         })
 
-    for key, family in (("synthetic_ml", "handcrafted_ml_detector"), ("synthetic_deep", "deep_detector")):
+    autogan_spectral = precomputed.get("autogan_spectral") or {}
+    if autogan_spectral.get("screening_flags"):
+        observations.append({
+            "family": "autogan_spectral_descriptors",
+            "signals": autogan_spectral.get("screening_flags"),
+            "calibrated": False,
+            "validated": False,
+            "scope": autogan_spectral.get("method_scope"),
+        })
+
+    for key, family in (
+        ("synthetic_ml", "handcrafted_ml_detector"),
+        ("synthetic_deep", "deep_detector"),
+        ("autogan_classifier", "autogan_spectral_detector"),
+    ):
         result = precomputed.get(key) or {}
         if result.get("status") == "success":
             score = result.get("score", result.get("score_synthetic"))
@@ -31,6 +45,8 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
                 "calibrated": bool(result.get("calibrated", False)),
                 "validated": bool(result.get("validated", False)),
             }
+            if result.get("method_scope"):
+                row["scope"] = result.get("method_scope")
             if result.get("validated") is True:
                 evidence.append(row)
             elif result.get("predicted_label") == "synthetic" or (isinstance(score, (int, float)) and float(score) >= 0.5):
@@ -45,7 +61,7 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
             "calibrated": False,
         })
 
-    base["protocol_version"] = "MFLAB-DF-0.5"
+    base["protocol_version"] = "MFLAB-DF-0.6"
     base["screening_observations"] = observations
     base["evidence_families"] = evidence
     base["validated_external_models"] = len([
@@ -60,15 +76,17 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
         base["triage_assessment"] = "no_strong_screening_signals"
     base["evidentiary_conclusion"] = "inconclusive"
     base["decision_policy"] = (
-        "MFLAB-DF-0.5 separates descriptive forensic features, uncalibrated screening, validated learned models and provenance. "
-        "No single score is a forensic verdict; cross-generator/domain validation and case-context convergence are required."
+        "MFLAB-DF-0.6 separates descriptive forensic features, AutoGAN-compatible GAN spectral descriptors, "
+        "uncalibrated screening, validated learned models and provenance. No single score is a forensic verdict; "
+        "cross-generator/domain validation and case-context convergence are required. A negative GAN-spectral result "
+        "does not exclude diffusion or other synthetic-media families."
     )
     return base
 
 
 def video_deepfake_protocol_v2(path: str | Path, external_models: list[dict] | None = None) -> dict:
     base = legacy_video_protocol(path, external_models=external_models or [])
-    base["protocol_version"] = "MFLAB-DF-0.5"
+    base["protocol_version"] = "MFLAB-DF-0.6"
     base["decision_policy"] = (
         "Frame/video scores, temporal consistency, encoding and provenance are separate evidence families. "
         "A deepfake conclusion requires validated detector/domain performance and expert convergence."

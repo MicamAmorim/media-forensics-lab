@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 
+from mf_lab.integrations.autogan import status as autogan_status
 from mf_lab.integrations.deepfakebench import status as deepfakebench_status
 from mf_lab.integrations.veritas import status as veritas_status
 from mf_lab.pipeline import PROFILES, analyze_case, analyze_file
@@ -55,7 +56,11 @@ def main():
     elif a.cmd == "report":
         print(generate_preliminary_report(a.case_dir, a.format))
     elif a.cmd == "integrations":
-        print(json.dumps({"veritas": veritas_status(), "deepfakebench": deepfakebench_status()}, indent=2, ensure_ascii=False))
+        print(json.dumps({
+            "veritas": veritas_status(),
+            "deepfakebench": deepfakebench_status(),
+            "autogan": autogan_status(),
+        }, indent=2, ensure_ascii=False))
     elif a.cmd == "validate-demo":
         result = validate_demo(a.dataset, a.out)
         print(json.dumps(result["summary"], indent=2, ensure_ascii=False))
@@ -74,6 +79,7 @@ def main():
             "sample_count": result["sample_count"],
             "selected_model": result["selected_model"],
             "metrics": result["selected_model_metrics"],
+            "autogan_checkpoint": result.get("autogan_checkpoint_evaluation", {}).get("status"),
         }, indent=2, ensure_ascii=False))
         print(f"benchmark_report={a.out}")
     elif a.cmd == "web":

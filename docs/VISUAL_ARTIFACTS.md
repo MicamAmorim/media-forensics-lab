@@ -1,4 +1,4 @@
-# MFLab Visual Forensic Artifacts — v0.7
+# MFLab Visual Forensic Artifacts — v0.8
 
 ## Objective
 
@@ -62,6 +62,18 @@ Draws the detected facial region and its comparison neighborhood, with noise/sha
 
 Creates four panels with their **own scales** for wavelet high-frequency energy, FFT multiband measurements, RGB correlations and selected texture/HOG features. It visualizes handcrafted features only and is not an AI probability.
 
+### AutoGAN-compatible spectra
+
+v0.8 adds five artifacts associated with `autogan_spectral`:
+
+- `autogan_fft_full.png` — normalized full spectrum;
+- `autogan_fft_low.png` — low-frequency partition;
+- `autogan_fft_mid.png` — mid-frequency partition;
+- `autogan_fft_high.png` — high-frequency partition;
+- `autogan_spectral_profile.png` — descriptive band-energy and replication indices.
+
+The four spectral images are based on per-channel log-FFT magnitude normalized with P5/P95 and displayed in the centered frequency plane. They are intended to make the GAN-upsampling spectral method inspectable. Periodicity or replication-like structure is not, by itself, proof of GAN generation; a negative image also does not exclude GANs, diffusion models or other synthetic-media families.
+
 ### Reference difference
 
 When a trusted corresponding reference is supplied, renders absolute difference as a heatmap and, when available, the largest changed component. Its value depends on the correspondence and provenance of the reference.
@@ -82,7 +94,7 @@ Collects frames associated with temporal anomalies/duplicates into a compact ins
 
 ## Interactive report
 
-The existing interface adds a `Gráficos e imagens` tab. Artifact PNGs are served only from the case `visuals/` directory through a path-checked local route. The overall visual language/layout is preserved.
+The existing interface keeps the `Gráficos e imagens` tab. AutoGAN-compatible PNGs use the same artifact schema and are therefore displayed automatically without redesigning the visual language/layout. Artifact PNGs are served only from the case `visuals/` directory through a path-checked local route.
 
 ## DOCX/Markdown report
 
@@ -92,14 +104,16 @@ The report generator appends:
 APÊNDICE A — ARTEFATOS VISUAIS DAS ANÁLISES
 ```
 
-Figures are numbered `A.1`, `A.2`, ... and include the artifact label, caption and limitation. The appendix is documentation of the examination; it does not turn screening methods into validated evidence.
+Figures are numbered `A.1`, `A.2`, ... and include the artifact label, caption and limitation. AutoGAN-compatible figures enter the same appendix automatically. The appendix is documentation of the examination; it does not turn screening methods into validated evidence.
 
 ## Regression expectations
 
 CI tests verify that:
 
 1. core visual artifacts can be rendered from a controlled image;
-2. artifact metadata paths point to existing files;
-3. the web API serializes and serves artifact PNGs;
-4. the DOCX contains the appendix heading and embeds at least one figure in the controlled report test;
-5. the canonical demo GT remains unchanged and must still pass 100% independently of visual rendering.
+2. AutoGAN spectral tensors have the expected 224×224 geometry and the low/mid/high partitions reconstruct the full tensor;
+3. AutoGAN PNG artifacts are generated and registered by the normal pipeline;
+4. artifact metadata paths point to existing files;
+5. the web API serializes and serves artifact PNGs;
+6. the DOCX contains the appendix heading and embeds at least one figure in the controlled report test;
+7. the canonical demo GT remains unchanged and must still pass 100% independently of visual rendering.

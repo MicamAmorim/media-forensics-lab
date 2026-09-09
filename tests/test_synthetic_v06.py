@@ -11,11 +11,12 @@ D = ROOT / "dataset" / "demo" / "images"
 def test_synthetic_feature_bank_is_stable_and_finite():
     r = extract_synthetic_feature_bank(D / "img_001_pristine.jpg")
     assert r["status"] == "success"
-    assert r["feature_count"] >= 35
+    assert r["feature_count"] >= 55
     assert "fft_hf_lf_ratio" in r["features"]
     assert "rgb_corr_rg" in r["features"]
     assert "wavelet_l1_hf_total" in r["features"]
     assert "hog_mean" in r["features"]
+    assert "autogan_low_energy_fraction" in r["features"]
 
 
 def test_ml_detector_is_disabled_without_explicit_model(monkeypatch):
@@ -35,15 +36,17 @@ def test_fusion_never_returns_evidentiary_verdict():
     assert r["evidentiary_conclusion"] == "inconclusive"
 
 
-def test_pipeline_exposes_v05_synthetic_protocol_and_new_methods(tmp_path):
+def test_pipeline_exposes_v06_synthetic_protocol_and_new_methods(tmp_path):
     from mf_lab.pipeline import analyze_file
     r = analyze_file(D / "img_001_pristine.jpg", tmp_path, profile="deepfake")
-    assert r["methods"]["deepfake_protocol"]["protocol_version"] == "MFLAB-DF-0.5"
+    assert r["methods"]["deepfake_protocol"]["protocol_version"] == "MFLAB-DF-0.6"
     for name in (
         "synthetic_feature_bank",
         "synthetic_ml",
         "synthetic_deep",
         "face_context_consistency",
+        "autogan_spectral",
+        "autogan_classifier",
         "synthetic_evidence_fusion",
     ):
         assert name in r["methods"]

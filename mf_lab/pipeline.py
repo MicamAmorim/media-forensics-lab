@@ -5,6 +5,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mf_lab.analysis.autogan_spectral import autogan_spectral_analysis
 from mf_lab.analysis.c2pa import c2pa_inspect
 from mf_lab.analysis.classical import (
     frequency_analysis,
@@ -28,6 +29,8 @@ from mf_lab.analysis.synthetic_deep import score_synthetic_onnx
 from mf_lab.analysis.synthetic_features import extract_synthetic_feature_bank
 from mf_lab.analysis.synthetic_ml import score_synthetic_ml
 from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies, motion_discontinuity_screen
+from mf_lab.autogan_visuals import generate_autogan_visual_artifacts
+from mf_lab.integrations.autogan import score_autogan_checkpoint, status as autogan_status
 from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
 from mf_lab.utils.io import sha256, write_json
@@ -57,11 +60,13 @@ METHODS = {
     "face_artifacts": {"refs": ["verdoliva_2020", "faceforensics_2019"], "screening_only": True},
     "face_context_consistency": {"refs": ["verdoliva_2020", "faceforensics_2019", "sao_2025"], "screening_only": True},
     "synthetic_spectral": {"refs": ["verdoliva_2020", "durall_2020", "say_alkan_kocak_2025"], "screening_only": True},
+    "autogan_spectral": {"refs": ["autogan_2019", "durall_2020"], "screening_only": True},
+    "autogan_classifier": {"refs": ["autogan_2019"], "model_based": True},
     "synthetic_feature_bank": {"refs": ["durall_2020", "cifake_2023", "say_alkan_kocak_2025"], "screening_only": True},
     "synthetic_ml": {"refs": ["cifake_2023", "deepfakebench_2023", "say_alkan_kocak_2025"], "model_based": True},
     "synthetic_deep": {"refs": ["deepfakebench_2023", "faceforensics_2019", "celebdf_2020", "wyawahare_2025", "sao_2025"], "model_based": True},
-    "synthetic_evidence_fusion": {"refs": ["verdoliva_2020", "deepfakebench_2023", "say_alkan_kocak_2025"], "screening_only": True},
-    "deepfake_protocol": {"refs": ["verdoliva_2020", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020", "durall_2020", "say_alkan_kocak_2025", "wyawahare_2025", "sao_2025"]},
+    "synthetic_evidence_fusion": {"refs": ["verdoliva_2020", "deepfakebench_2023", "say_alkan_kocak_2025", "autogan_2019"], "screening_only": True},
+    "deepfake_protocol": {"refs": ["verdoliva_2020", "deepfakebench_2023", "faceforensics_2019", "celebdf_2020", "durall_2020", "autogan_2019", "say_alkan_kocak_2025", "wyawahare_2025", "sao_2025"]},
     "video_timing": {"refs": ["swgde_video_auth", "swgde_ffmpeg"]},
     "video_duplicates": {"refs": ["swgde_video_auth"], "screening_only": True},
     "video_transition_anomalies": {"refs": ["swgde_video_auth"], "screening_only": True},
@@ -74,8 +79,8 @@ METHODS = {
 
 PROFILES = {
     "quick": "Integrity/provenance + metadata + compact classical/deepfake screening.",
-    "deepfake": "Full synthetic/deepfake protocol with handcrafted feature bank and optional validated ML/deep models.",
-    "full": "All native image/video screening methods plus synthetic-media protocol.",
+    "deepfake": "Full synthetic/deepfake protocol with handcrafted features, AutoGAN-compatible spectral analysis and optional validated ML/deep models.",
+    "full": "All native image/video screening methods plus synthetic-media protocol and AutoGAN-compatible spectral analysis.",
 }
 
 
@@ -85,6 +90,7 @@ def _environment() -> dict:
         "platform": platform.platform(),
         "mflab_version": current_version(),
         "veritas_integration": veritas_status(),
+        "autogan_integration": autogan_status(),
     }
 
 
@@ -93,6 +99,23 @@ def _safe_method(methods: dict, name: str, fn, *args, **kwargs) -> None:
         methods[name] = fn(*args, **kwargs)
     except Exception as e:
         methods[name] = {"status": "error", "error": repr(e)}
+
+
+def _merge_visual_artifacts(base: dict, extra: dict) -> dict:
+    if not isinstance(base, dict):
+        base = {"status": "no_artifacts", "artifact_count": 0, "items": [], "errors": []}
+    base.setdefault("items", [])
+    base.setdefault("errors", [])
+    base["items"].extend(extra.get("items") or [])
+    base["errors"].extend(extra.get("errors") or [])
+    base["artifact_count"] = len(base["items"])
+    if base["items"]:
+        base["status"] = "success"
+    base["autogan"] = {
+        "status": extra.get("status"),
+        "artifact_count": int(extra.get("artifact_count", 0) or 0),
+    }
+    return base
 
 
 def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
@@ -108,7 +131,7 @@ def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
     is_image = ext in IMAGE_EXTS or not is_video
     external_models = load_case_external_models(case_dir, path.name) if case_dir else []
     report = {
-        "schema_version": "0.6",
+        "schema_version": "0.7",
         "file": str(path),
         "sha256": sha256(path),
         "size_bytes": path.stat().st_size,
@@ -144,9 +167,11 @@ def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
             _safe_method(m, "face_artifacts", face_artifact_screen, path)
             _safe_method(m, "face_context_consistency", face_context_consistency, path)
             _safe_method(m, "synthetic_spectral", synthetic_spectral_screen, path)
+            _safe_method(m, "autogan_spectral", autogan_spectral_analysis, path)
             _safe_method(m, "synthetic_feature_bank", extract_synthetic_feature_bank, path)
             _safe_method(m, "synthetic_ml", score_synthetic_ml, m.get("synthetic_feature_bank", {}))
             _safe_method(m, "synthetic_deep", score_synthetic_onnx, path)
+            _safe_method(m, "autogan_classifier", score_autogan_checkpoint, path)
         if ext in {".jpg", ".jpeg"}:
             _safe_method(m, "jpeg_quantization", jpeg_quantization_analysis, path)
             if profile in {"deepfake", "full"}:
@@ -161,8 +186,9 @@ def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
             _safe_method(m, "synthetic_evidence_fusion", synthetic_evidence_fusion, m)
         precomputed = {k: m.get(k) for k in (
             "c2pa", "noise_map", "resampling", "prnu_screen", "face_artifacts",
-            "face_context_consistency", "synthetic_spectral", "synthetic_feature_bank",
-            "synthetic_ml", "synthetic_deep", "synthetic_evidence_fusion",
+            "face_context_consistency", "synthetic_spectral", "autogan_spectral",
+            "synthetic_feature_bank", "synthetic_ml", "synthetic_deep", "autogan_classifier",
+            "synthetic_evidence_fusion",
         )}
         _safe_method(m, "deepfake_protocol", image_deepfake_protocol_v2, path, precomputed, external_models)
         if run_veritas:
@@ -171,9 +197,11 @@ def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
     report["method_registry"] = {k: METHODS[k] for k in m if k in METHODS}
     visual_root = Path(case_dir) if case_dir is not None else out
     try:
-        report["visual_artifacts"] = generate_visual_artifacts(
-            path, visual_root, m, reference_path=reference_path
-        )
+        visuals = generate_visual_artifacts(path, visual_root, m, reference_path=reference_path)
+        if is_image and isinstance(m.get("autogan_spectral"), dict):
+            autogan_visuals = generate_autogan_visual_artifacts(path, visual_root, m.get("autogan_spectral") or {})
+            visuals = _merge_visual_artifacts(visuals, autogan_visuals)
+        report["visual_artifacts"] = visuals
     except Exception as e:
         report["visual_artifacts"] = {
             "status": "error",
@@ -218,7 +246,7 @@ def analyze_case(case_dir: str | Path, profile: str = "full", run_veritas: bool 
         except Exception as e:
             write_json(results / (p.name + ".error.json"), {"file": str(p), "error": repr(e)})
     write_json(case / "report.json", {
-        "schema_version": "0.6",
+        "schema_version": "0.7",
         "case_id": case.name,
         "profile": profile,
         "veritas_crosscheck_requested": bool(run_veritas),
