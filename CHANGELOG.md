@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.1 - 2026-09-09
+
+### Added
+- Native C2PA validation through the official `c2pa-python` SDK, with `c2patool` compatibility fallback and marker-only fallback as a last resort.
+- Explicit C2PA validation fields for active manifest, signature validation, asset data-hash validation, validation failures and producer hint.
+- Regression fixture for a controlled OpenAI-generated image that produced a CIFAKE false-negative while independent forensic screening families converged.
+- Regression tests preserving the distinction between a wrong machine `real` vote, expert-review escalation and an `inconclusive` evidentiary conclusion.
+
+### Changed
+- Project version bumped to `0.9.1`.
+- Moderate or high convergence across independent screening families now triggers `needs_expert_review` even when no learned model is validated for the input.
+- Cross-family review escalation remains prioritization only: it does not populate validated evidence families and does not create a synthetic/deepfake verdict.
+- C2PA cryptographic integrity is now kept separate from certificate trust and from truthfulness of the depicted content.
+
+### Fixed
+- Preliminary reports no longer say that zero protocols require expert review when the synthetic-evidence fusion explicitly reports moderate/high convergence for expert review.
+- Railway/web deployments no longer depend on an external `c2patool` executable to perform C2PA manifest validation when the Python SDK can read the asset.
+
 ## 0.9.0 - 2026-09-09
 
 ### Added
@@ -78,31 +96,97 @@
 - Explainable synthetic-media feature bank: multiband FFT, Haar-wavelet energies, HOG, RGB correlations, GLCM/LBP and color moments.
 - Face-versus-context consistency screening for local facial replacement.
 - Optional handcrafted ML detector bundle with explicit validation/calibration metadata.
-- Optional ONNX deep-detector adapter without bundled unvalidated weights.
-- Conservative cross-family synthetic evidence convergence summary.
-- Scientific validation layer `MFLAB-SCI-SYNTH-0.2`, separate from regression CI.
-- Scientific benchmark metrics including FPR, specificity, ROC-AUC, PR-AUC and Brier score, grouped by generator/transform and optional leave-one-generator-out.
-- Model selection isolated from the final test set through an explicit validation split or stratified cross-validation on training data.
+- Synthetic evidence fusion that summarizes convergence across independent signal families without producing an evidentiary verdict.
+- `MFLAB-DF-0.5` integration for synthetic feature/model outputs and face-context screening.
+- Scientific validation protocol `MFLAB-SCI-SYNTH-0.2` supporting a development split and a locked final test split.
+- Optional Kaggle CIFAKE downloader for external real-vs-AI benchmarking.
+- Tests for feature stability, ML semantics, fusion policy and protocol integration.
 
 ### Changed
-- Deepfake protocol upgraded to `MFLAB-DF-0.5`.
-- `deepfake`/`full` profiles now execute the new feature bank, face-context screen, optional ML/deep adapters and evidence fusion.
-- Project version bumped to 0.6.0; scikit-learn added to core dependencies and ONNX Runtime exposed as optional `deep` dependency.
-- Interactive site appearance intentionally unchanged; backend method results are extended only.
+- Project version bumped to `0.6.0`.
+- Deepfake profile now includes the synthetic feature bank, optional learned detectors, face-context consistency and evidence fusion.
+- `MFLAB-DF` now consumes validated learned models as evidence only when their output explicitly declares `validated=true`.
 
-### Scientific policy
-- Regression GT remains the mandatory deterministic CI oracle.
-- Large-scale scientific validation is explicitly separate and must use external datasets/splits.
-- Exported ML bundles default to `validated: false`; benchmark success alone does not grant forensic validity.
+### Forensic policy
+- Handcrafted features and heuristic screens are not probabilities of AI generation.
+- Unvalidated model outputs are screening only.
+- Evidence fusion is a review-prioritization summary, not a posterior probability.
+- Final synthetic-media claims require documented validation on the relevant domain and expert convergence.
 
 ## 0.5.0 - 2026-09-08
-- Interactive HTML forensic report, strict CI/CD, canonical independent ground truth and packaging/release gates.
+
+### Added
+- Explicitly conservative video-authentication protocol with timestamp/GOP structure, duplicate-frame screening, abrupt-transition screening and optical-flow discontinuity screening.
+- Adjacent duplicate-frame triage using normalized mean absolute difference.
+- Robust abrupt-transition detection using a median/MAD threshold over frame-to-frame visual differences.
+- Farneback optical-flow discontinuity screening with robust thresholding.
+- Reference-assisted video alignment using constrained dynamic programming when a reference copy is available.
+- Validation rule for `manipulated_interval` ground truth in synthetic/demo cases.
+
+### Changed
+- Project version bumped to `0.5.0`.
+- Video protocol no longer treats a pHash anomaly count as a direct deepfake indicator.
+- `video_deepfake_protocol` now consumes structural/temporal screening results and keeps `evidentiary_conclusion` conservative.
+- Canonical validation now requires detection of a manipulated video interval while rejecting pristine/demo controls.
+
+### Forensic policy
+- Temporal anomalies can indicate editing, transcoding, packet loss or other non-malicious processing; they require corroboration.
+- No single frame-level or temporal score is converted into a deepfake verdict.
 
 ## 0.4.0 - 2026-09-08
-- Synthetic fixtures, reference-assisted localization/alignment, motion discontinuity and C2PA marker fallback.
+
+### Added
+- Synthetic face-replacement and fully synthetic image fixtures with ground-truth masks and canonical validation expectations.
+- Reference-assisted image localization with connected-component bounding boxes.
+- Video segment-deletion fixture with manipulated-interval ground truth.
+- Improved copy-move ORB detector with translation clustering and false-positive suppression.
+- Expanded MFLAB-DF image protocol with face-region, spectral, noise, resampling, PRNU-like and C2PA screening families.
+
+### Changed
+- Project version bumped to `0.4.0`.
+- Fixture generator now emits its own `generator.py` to make synthetic test data portable in CI.
+- Canonical validation tolerances updated to capture intended manipulations without overclaiming forensic certainty.
+
+### Forensic policy
+- Native face/spectral/PRNU-like signals remain engineering triage, not validated deepfake-classifier evidence.
+- C2PA/JUMBF marker presence is recorded as provenance screening when cryptographic validation is unavailable.
+- Canonical CI validation is a regression gate on controlled fixtures, not a claim of population-level scientific accuracy.
+
+## 0.3.1 - 2026-09-08
+
+### Fixed
+- Corrected source-file handling in `validate_ground_truth()` so expected ground-truth checks no longer re-analyze already-generated JSON reports.
+- Canonical demo validation now passes on both pristine and manipulated image fixtures.
 
 ## 0.3.0 - 2026-09-08
-- Controlled validation harness and calibrated screening semantics.
 
-## 0.2.0 - 2026-09-08
-- Expanded classical forensics and MFLAB-DF integration architecture.
+### Added
+- Ground-truth-aware validation gate with explicit TP/FP/FN/TN counts and per-case expectations.
+- Canonical demo fixture metadata with pristine, manipulated and copy-move regions.
+- CI gate for canonical ground-truth validation.
+
+### Changed
+- Demo fixture generator now creates deterministic pristine, splice and copy-move samples plus `ground_truth.json`.
+- `validate` CLI supports `--ground-truth` and returns non-zero if canonical expectations fail.
+
+## 0.2.0 - 2026-09-07
+
+### Added
+- Reference-assisted image comparison (`reference_image_difference`) with local difference metrics.
+- Reference-assisted video alignment (`reference_video_alignment`) using sampled-frame pHash/DCT descriptors.
+- Case schema supports per-file references through `case.reference_map`.
+- Case-level `report.json` consolidating individual reports and validation status.
+- Markdown and DOCX expert reports with method registry and source references.
+- Optional CodeRafay/Veritas cross-check integration via isolated subprocess adapter.
+
+### Changed
+- Improved case analyzer with canonical result aggregation.
+- Report generator now includes references needed by methods actually executed.
+
+## 0.1.0 - 2026-09-07
+
+### Added
+- Initial reproducible case structure, image/video screening modules and CLI.
+- SHA-256 integrity hashing, metadata, ELA, noise residual, histogram and perceptual hashes.
+- Basic FFT/resampling/PRNU-like/copy-move/steganalysis screens.
+- Preliminary Markdown/DOCX report generation with legal and scientific references.

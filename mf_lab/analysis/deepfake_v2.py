@@ -88,13 +88,23 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
                 observations.append(row)
 
     fusion = precomputed.get("synthetic_evidence_fusion") or {}
+    convergence_level = fusion.get("convergence_level")
     if fusion.get("family_count", 0):
         observations.append({
             "family": "cross_family_convergence",
-            "signals": [fusion.get("convergence_level")],
+            "signals": [convergence_level],
             "independent_families": fusion.get("independent_families", []),
             "calibrated": False,
         })
+
+    review_reasons = []
+    if evidence:
+        review_reasons.append("validated_model_or_evidence_family_present")
+    if convergence_level in {
+        "moderate_convergence_for_expert_review",
+        "high_convergence_for_expert_review",
+    }:
+        review_reasons.append(f"cross_family_convergence:{convergence_level}")
 
     base["protocol_version"] = "MFLAB-DF-0.7"
     base["screening_observations"] = observations
@@ -104,7 +114,8 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
         x for x in evidence
         if x.get("validated") is True or x.get("family") == "validated_learned_detector"
     ])
-    if evidence:
+    base["review_reasons"] = review_reasons
+    if review_reasons:
         base["triage_assessment"] = "needs_expert_review"
     elif observations:
         base["triage_assessment"] = "screening_observations_only"
@@ -115,6 +126,7 @@ def image_deepfake_protocol_v2(path: str | Path, precomputed: dict | None = None
         "MFLAB-DF-0.7 separates the machine real/synthetic assessment from the forensic evidentiary conclusion. "
         "The bundled CIFAKE classifier may produce an automatic label, but it is treated as screening outside its declared validation domain. "
         "Descriptive forensic features, AutoGAN-compatible GAN spectral descriptors, uncalibrated screening, validated learned models and provenance remain separate. "
+        "Moderate/high convergence across independent screening families triggers expert-review prioritization without becoming evidence or a synthetic-media verdict. "
         "No single score is a forensic verdict; cross-generator/domain validation and case-context convergence are required. "
         "A negative GAN-spectral result does not exclude diffusion or other synthetic-media families."
     )
