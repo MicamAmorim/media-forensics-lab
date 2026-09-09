@@ -98,6 +98,7 @@ def _method_summary(name: str, result) -> dict:
         "adjacent_near_duplicates", "anomaly_count", "triage_assessment", "evidentiary_conclusion",
         "validated_external_models", "protocol_version", "cryptographically_validated", "markers_found",
         "feature_count", "convergence_level", "family_count", "validated", "calibrated",
+        "bundle_validated", "validated_for_input", "validation_scope_status",
     )
     picked = {k: result.get(k) for k in interesting_keys if k in result}
     if not picked:
@@ -128,6 +129,7 @@ def _serialize_report(run_id: str, report: dict) -> dict:
     proto = methods.get("deepfake_protocol") or methods.get("video_deepfake_protocol") or {}
     triage = proto.get("triage_assessment", "não informado") if isinstance(proto, dict) else "não informado"
     conclusion = proto.get("evidentiary_conclusion", "inconclusivo") if isinstance(proto, dict) else "inconclusivo"
+    machine_assessment = proto.get("machine_assessment", {}) if isinstance(proto, dict) else {}
     signal_counts = _signal_counts(methods)
     artifacts = _artifact_rows(run_id, report)
     return {
@@ -138,6 +140,7 @@ def _serialize_report(run_id: str, report: dict) -> dict:
         "profile": report.get("profile"),
         "triage_assessment": triage,
         "evidentiary_conclusion": conclusion,
+        "machine_assessment": machine_assessment,
         "signal_counts": signal_counts,
         "signal_total": sum(signal_counts.values()),
         "preview_url": f"/api/run/{run_id}/media/{name}",
@@ -236,7 +239,7 @@ def create_app() -> Flask:
                 "json": f"/api/run/{run_id}/download/json",
             },
             "generated": {"docx": Path(docx_path).name, "md": Path(md_path).name},
-            "warning": "Os gráficos e imagens derivados são instrumentos de inspeção e documentação. Não representam, isoladamente, probabilidade de falsificação, peso de evidência ou conclusão pericial automática.",
+            "warning": "A classificação automática real/sintética é separada da conclusão pericial. Gráficos e imagens derivados também não representam, isoladamente, peso de evidência.",
         })
 
     def _case_or_404(run_id: str) -> Path:
