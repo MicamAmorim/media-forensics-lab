@@ -3,7 +3,10 @@ from __future__ import annotations
 import csv
 import json
 import math
+import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -32,6 +35,57 @@ def _rows_url(split: str, offset: int, length: int = 100) -> str:
         }
     )
     return f"{sa.HF_DATA_SERVER}/rows?{params}"
+
+
+def _retry_after_seconds(exc: urllib.error.HTTPError, attempt: int) -> float:
+    raw = exc.headers.get("Retry-After") if exc.headers is not None else None
+    if raw:
+        try:
+            return max(1.0, min(120.0, float(raw)))
+        except ValueError:
+            pass
+    return min(60.0, 2.0 ** min(attempt, 6))
+
+
+def _rows_json_get(
+    url: str,
+    *,
+    timeout: int = 60,
+    retries: int = 8,
+) -> tuple[dict, dict]:
+    """Dataset Viewer GET with explicit 429 handling and auditable retry metadata."""
+    last: Exception | None = None
+    rate_limit_hits = 0
+    started = time.monotonic()
+    for attempt in range(1, retries + 1):
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "MFLab-second-classifier/0.3"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+                return payload, {
+                    "attempts": attempt,
+                    "rate_limit_hits": rate_limit_hits,
+                    "elapsed_seconds": round(time.monotonic() - started, 6),
+                    "http_status": response.getcode(),
+                }
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if exc.code == 429:
+                rate_limit_hits += 1
+                wait = _retry_after_seconds(exc, attempt)
+            else:
+                wait = min(20.0, 1.5 * (2 ** (attempt - 1)))
+        except Exception as exc:  # pragma: no cover - network behavior
+            last = exc
+            wait = min(20.0, 1.5 * (2 ** (attempt - 1)))
+        if attempt < retries:
+            time.sleep(wait)
+    raise RuntimeError(
+        f"Dataset Viewer request failed after {retries} attempts: {url}"
+    ) from last
 
 
 def _page_order(split: str, page_size: int, seed: int) -> list[int]:
@@ -68,14 +122,15 @@ def fetch_generator_quota_rows(
     seed: int = DEFAULT_SEED,
     page_size: int = 100,
     headroom: float = 0.10,
+    request_delay_seconds: float = 1.0,
 ) -> tuple[dict[str, list[dict]], dict]:
     """Collect a reproducible per-generator sample through `/rows` only.
 
     Pages are visited in a deterministic pseudorandom order over the entire
-    split. Scanning stops only after every requested generator has enough exact
-    rows plus a small headroom. The final rows are then sampled deterministically
-    within each generator. This avoids relying on Dataset Viewer `/filter` and
-    `/search`, both of which can fail on this 35 GB image dataset.
+    split. Network pages are cached and deliberately throttled. HTTP 429 obeys
+    Retry-After when available and otherwise uses exponential backoff. A failed
+    run can therefore resume from its cached pages instead of restarting from
+    page zero.
     """
     if split not in SPLIT_ROWS:
         raise ValueError(f"unsupported split: {split}")
@@ -84,18 +139,27 @@ def fetch_generator_quota_rows(
     if unknown:
         raise ValueError(f"unknown generators: {unknown}")
     if not normalized:
-        return {}, {"split": split, "pages_fetched": 0, "rows_scanned": 0}
+        return {}, {
+            "split": split,
+            "pages_fetched": 0,
+            "rows_scanned": 0,
+            "network_requests": 0,
+            "cache_hits": 0,
+            "rate_limit_hits": 0,
+        }
 
     targets = {
         g: max(n, int(math.ceil(n * (1.0 + max(0.0, headroom)))))
         for g, n in normalized.items()
     }
-    buckets: dict[str, dict[int, dict]] = {
-        g: {} for g in normalized
-    }
+    buckets: dict[str, dict[int, dict]] = {g: {} for g in normalized}
     cache_root = Path(cache_dir) if cache_dir else None
     pages_fetched = 0
     rows_scanned = 0
+    network_requests = 0
+    cache_hits = 0
+    rate_limit_hits = 0
+    request_attempts = 0
     order = _page_order(split, page_size, seed)
 
     for page_index in order:
@@ -108,13 +172,19 @@ def fetch_generator_quota_rows(
             )
         if cache_file is not None and cache_file.is_file():
             payload = json.loads(cache_file.read_text(encoding="utf-8"))
+            cache_hits += 1
         else:
-            payload = sa._json_get(_rows_url(split, offset, length), timeout=60, retries=3)
+            payload, request_meta = _rows_json_get(_rows_url(split, offset, length))
+            network_requests += 1
+            rate_limit_hits += int(request_meta.get("rate_limit_hits", 0))
+            request_attempts += int(request_meta.get("attempts", 1))
             if cache_file is not None:
                 cache_file.parent.mkdir(parents=True, exist_ok=True)
                 cache_file.write_text(
                     json.dumps(payload, ensure_ascii=False), encoding="utf-8"
                 )
+            if request_delay_seconds > 0:
+                time.sleep(float(request_delay_seconds))
 
         page = payload.get("rows") or []
         if not page:
@@ -132,7 +202,11 @@ def fetch_generator_quota_rows(
         if all(len(buckets[g]) >= targets[g] for g in normalized):
             break
 
-    missing = {g: normalized[g] - len(buckets[g]) for g in normalized if len(buckets[g]) < normalized[g]}
+    missing = {
+        g: normalized[g] - len(buckets[g])
+        for g in normalized
+        if len(buckets[g]) < normalized[g]
+    }
     if missing:
         raise RuntimeError(
             f"could not satisfy generator quotas from /rows for split {split}: {missing}"
@@ -166,6 +240,11 @@ def fetch_generator_quota_rows(
         "requested_quotas": normalized,
         "candidate_counts": {g: len(buckets[g]) for g in normalized},
         "headroom": float(headroom),
+        "request_delay_seconds": float(request_delay_seconds),
+        "network_requests": int(network_requests),
+        "cache_hits": int(cache_hits),
+        "request_attempts": int(request_attempts),
+        "rate_limit_hits": int(rate_limit_hits),
     }
     return selected, summary
 
@@ -263,10 +342,10 @@ def build_selective_plan_rows(
         raise RuntimeError(f"selective plan contains {unresolved} unresolved source URLs")
     summary.update(
         {
-            "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-SELECTIVE-ROWS-0.3",
+            "protocol": "MFLAB-SCI-AIGENBENCH-SECOND-SELECTIVE-ROWS-0.4",
             "seed": int(seed),
             "hf_dataset": sa.HF_DATASET,
-            "remote_backend": "dataset_viewer_rows_random_page_scan",
+            "remote_backend": "dataset_viewer_rows_random_page_scan_rate_limited",
             "unresolved_source_urls": 0,
             "full_fake_dataset_download_required": False,
             "scan": {"train": train_scan, "validation": val_scan},
