@@ -35,8 +35,8 @@
     "decision_threshold": 0.5,
     "calibrated": true,
     "validated": true,
-    "model_sha256": "0b0e9fce64120990e56a282fbd893579fe7adb5e75d996da8428186bfcab9836",
-    "sklearn_version": "1.8.0"
+    "model_sha256": "44ad0108e8f378a5ea2dc1e6fef28e5c1bfdcbde7b7ccf02c4944c7fee0bd968",
+    "sklearn_version": "1.7.2"
   },
   "primary_fresh_holdout": {
     "status": "primary",
