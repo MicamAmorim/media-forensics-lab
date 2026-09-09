@@ -29,6 +29,16 @@ This avoids introducing JPEG/resampling artifacts during dataset preparation.
 
 Dataset Viewer pages are cached under the requested cache directory. Already materialized images are re-used after decode verification and their SHA-256 is recomputed. An interrupted acquisition can therefore be resumed without restarting the full scan or redownloading completed files.
 
+## Completeness gate
+
+Embedding extraction is intentionally strict. Before DINOv2 runs, every row in the materialized manifest must:
+
+- point to an existing local file;
+- carry a 64-character SHA-256 digest;
+- preserve class balance inside each role.
+
+A dead LAION URL, failed COCO download or unresolved source therefore stops the scientific run. The pipeline will not silently shrink the sample and continue training on a different distribution.
+
 ## Workflow
 
 Install research dependencies:
@@ -85,6 +95,8 @@ python scripts/second_classifier_acquire.py extract-embeddings \
   --device auto \
   --batch-size 32
 ```
+
+This command first applies the completeness gate described above.
 
 ### 5. Train the calibrated head and learning curve
 
