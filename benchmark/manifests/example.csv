@@ -1,0 +1,5 @@
+path,label,generator,split,transform
+D:/datasets/real/train_001.jpg,real,camera,train,original
+D:/datasets/stylegan3/train_001.png,synthetic,StyleGAN3,train,original
+D:/datasets/real/test_001.jpg,real,camera,test,jpeg_q70
+D:/datasets/progan/test_001.png,synthetic,ProGAN,test,jpeg_q70
