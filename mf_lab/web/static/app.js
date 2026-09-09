@@ -43,6 +43,29 @@ function renderFiles(files){
   document.querySelectorAll('.method button').forEach(btn=>btn.addEventListener('click',()=>btn.parentElement.classList.toggle('open')));
 }
 
+function artifactCard(a){
+  const warning=a.warning ? `<div class="artifact-warning">${escapeHtml(a.warning)}</div>` : '';
+  return `<figure class="artifact-card"><a href="${a.url}" target="_blank" rel="noopener"><img src="${a.url}" alt="${escapeHtml(a.label||a.id)}" loading="lazy"></a><figcaption><div class="artifact-kicker">${escapeHtml(a.category||'análise visual')}</div><strong>${escapeHtml(a.label||a.id)}</strong><p>${escapeHtml(a.caption||'')}</p>${warning}</figcaption></figure>`;
+}
+
+function renderArtifacts(files){
+  const groups = files.map((f,i)=>{
+    const artifacts=f.artifacts||[];
+    const body = artifacts.length ? `<div class="artifact-grid">${artifacts.map(artifactCard).join('')}</div>` : `<div class="notice">Nenhum artefato visual foi gerado para este arquivo com os métodos disponíveis neste perfil.</div>`;
+    return `<section class="artifact-file"><div class="artifact-file-head"><div><span class="file-badge static">#${String(i+1).padStart(2,'0')}</span><h3>${escapeHtml(f.name)}</h3></div><span class="artifact-count">${artifacts.length} artefato${artifacts.length===1?'':'s'}</span></div>${body}</section>`;
+  }).join('');
+  $('#artifactGallery').innerHTML = groups || '<div class="notice">Nenhum artefato visual disponível.</div>';
+}
+
+function activateTab(name){
+  document.querySelectorAll('.result-tab').forEach(btn=>{
+    const on=btn.dataset.tab===name; btn.classList.toggle('active',on); btn.setAttribute('aria-selected',on?'true':'false');
+  });
+  document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('active',panel.id===`tab-${name}`));
+}
+
+document.querySelectorAll('.result-tab').forEach(btn=>btn.addEventListener('click',()=>activateTab(btn.dataset.tab)));
+
 analyzeBtn.addEventListener('click', async()=>{
   hideError(); if(!selectedFiles.length){ showError('Selecione pelo menos uma imagem.'); return; }
   progress.classList.remove('hidden'); analyzeBtn.disabled=true; analyzeBtn.textContent='Analisando…';
@@ -52,7 +75,8 @@ analyzeBtn.addEventListener('click', async()=>{
     if(!res.ok) throw new Error(data.error||`Falha HTTP ${res.status}`);
     $('#results').classList.remove('hidden'); $('#runTitle').textContent=data.run_id; $('#summaryCards').innerHTML=summaryCards(data.summary);
     $('#downloadDocx').href=data.downloads.docx; $('#downloadMd').href=data.downloads.md; $('#downloadJson').href=data.downloads.json;
-    renderOverview(data.files); renderFiles(data.files); $('#results').scrollIntoView({behavior:'smooth',block:'start'});
+    renderOverview(data.files); renderFiles(data.files); renderArtifacts(data.files); activateTab('summary');
+    $('#results').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(err){ showError(err.message||String(err)); }
   finally{ progress.classList.add('hidden'); analyzeBtn.disabled=false; analyzeBtn.textContent='Executar análise'; }
 });
