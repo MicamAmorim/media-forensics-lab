@@ -4,7 +4,9 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('case_id'); ap.add_argument('--from-demo',action='store_true'); a=ap.parse_args()
-    c=ROOT/a.case_id; (c/'original').mkdir(parents=True,exist_ok=True); (c/'working').mkdir(exist_ok=True); (c/'results').mkdir(exist_ok=True); (c/'logs').mkdir(exist_ok=True); (c/'final').mkdir(exist_ok=True)
+    c=ROOT/a.case_id
+    for sub in ('original','working','results','logs','final','visuals'):
+        (c/sub).mkdir(parents=True,exist_ok=True)
     d=yaml.safe_load((ROOT/'templates'/'case.yaml').read_text(encoding='utf-8')); d['case']['id']=a.case_id
     if a.from_demo:
         for p in (ROOT/'dataset'/'demo'/'images').glob('*'): shutil.copy2(p,c/'original'/p.name)
