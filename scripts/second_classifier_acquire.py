@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
 from mf_lab.training.selective_acquisition import (
     DEFAULT_BACKBONE,
     DEFAULT_OOD_GENERATORS,
     DEFAULT_SEED,
     build_selective_plan,
-    extract_materialized_embeddings,
     materialize_plan,
+)
+from mf_lab.training.selective_embeddings import (
+    extract_verified_materialized_embeddings,
 )
 
 
@@ -44,7 +45,7 @@ def parser() -> argparse.ArgumentParser:
 
     emb = sub.add_parser(
         "extract-embeddings",
-        help="extract DINOv2 embeddings from a materialized selective sample",
+        help="verify the complete sample and extract frozen DINOv2 embeddings",
     )
     emb.add_argument("--manifest", required=True)
     emb.add_argument("--out", required=True)
@@ -75,9 +76,9 @@ def main() -> int:
             max_samples=args.max_samples,
         )
     elif args.command == "extract-embeddings":
-        result = extract_materialized_embeddings(
-            args.manifest,
+        result = extract_verified_materialized_embeddings(
             args.out,
+            manifest_csv=args.manifest,
             backbone=args.backbone,
             batch_size=args.batch_size,
             device=args.device,
