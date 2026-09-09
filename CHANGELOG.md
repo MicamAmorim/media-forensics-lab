@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.2 - 2026-09-09
+
+### Added
+- Detailed C2PA diagnostics sourced from the official SDK validation APIs: validation state, trust status, signature trust, integrity validation, validation success/failure entries, explanations, URLs, active-manifest metadata, signature information, assertion labels, embed/remote location and tool version.
+- `mflab benchmark-convergence` for descriptive sensitivity, specificity, false-positive rate, false-negative rate, precision, accuracy, balanced accuracy and confusion-matrix measurement of review escalation on labeled media.
+- Wilson 95% intervals for sensitivity and specificity so small pilot samples visibly retain their uncertainty.
+- A dedicated CI `convergence-benchmark` artifact generated from the controlled demo corpus.
+- External convergence-benchmark manifest support using explicit `path,expected_synthetic` labels.
+
+### Changed
+- Project version bumped to `0.9.2`.
+- C2PA integrity validation and signer trust are now explicit independent fields. `ValidationState=Valid` is treated as valid integrity without trusted signer status; `ValidationState=Trusted` additionally records signer trust.
+- C2PA `Reader.json()`, `get_validation_state()`, `get_validation_results()`, `get_active_manifest()`, `is_embedded()` and `get_remote_url()` are used as primary diagnostic sources; `detailed_json()` is retained as supplemental case data.
+- Convergence benchmarking records the existing thresholds exactly as implemented and never optimizes them on the benchmark sample.
+
+### Scientific / forensic policy
+- Convergence metrics are descriptive error rates for the supplied labeled sample only; they do not establish population-level forensic validity or cross-generator generalization.
+- `needs_expert_review` remains a triage decision, not a synthetic/deepfake verdict.
+- C2PA provenance validation does not establish factual truth of depicted content, and a valid-but-untrusted signature is not represented as trusted provenance.
+
 ## 0.9.1 - 2026-09-09
 
 ### Added
