@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.0 - 2026-09-08
+
+### Added
+- Visual-artifact renderer writing derivative PNGs under `case/visuals/`.
+- Image artifacts: amplified ELA, noise residual, FFT spectrum, RGB histogram, JPEG Ghost curve, resampling autocorrelation, copy-move overlay, face-context overlay, synthetic feature profile and reference-difference map.
+- Video artifacts: frame-transition timeline, optical-flow timeline and signaled keyframe contact sheet.
+- New `Gráficos e imagens` tab in the existing interactive report without redesigning its visual identity.
+- `Apêndice A — Artefatos Visuais das Análises` in DOCX and Markdown reports with captions and method limitations.
+- Artifact metadata and paths in each file report, with a safe local web route for viewing the generated PNGs.
+- Tests for artifact generation, web serving and DOCX appendix embedding.
+
+### Changed
+- Report schema bumped to `0.6`.
+- New v0.6 synthetic-media methods now have friendly labels and concise summaries in the report generator.
+- Web version label is sourced from package metadata instead of being hardcoded.
+
+### Forensic policy
+- Visual artifacts are derivative inspection/documentation aids; they do not create an independent evidence family and do not increase evidentiary weight by themselves.
+- Existing GT regression and MFLAB-DF evidentiary safeguards remain unchanged.
+
 ## 0.6.0 - 2026-09-08
 
 ### Added
