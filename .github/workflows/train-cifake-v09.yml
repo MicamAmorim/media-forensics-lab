@@ -127,6 +127,8 @@ jobs:
           git status --short
           git diff --cached --quiet && exit 0
           git commit -m "validation: regenerate CIFAKE v0.9 model"
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
           git push origin HEAD:${GITHUB_REF_NAME}
       - uses: actions/upload-artifact@v4
         with:
