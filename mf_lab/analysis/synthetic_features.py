@@ -102,6 +102,7 @@ def extract_synthetic_feature_bank(path: str | Path) -> dict:
     """
     rgb = _read_rgb(path)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    input_height, input_width = int(rgb.shape[0]), int(rgb.shape[1])
     features: dict[str, float] = {}
     features.update(_haar_energies(gray))
     features.update(_rgb_correlations(rgb))
@@ -140,6 +141,9 @@ def extract_synthetic_feature_bank(path: str | Path) -> dict:
         "feature_family": "synthetic_handcrafted_v2",
         "feature_count": len(features),
         "features": features,
+        "input_shape": [input_height, input_width, 3],
+        "input_height": input_height,
+        "input_width": input_width,
         "feature_sources": {
             "mflab_classical_synthetic": len(features) - len(autogan_features),
             "autogan_compatible_spectral": len(autogan_features),
