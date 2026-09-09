@@ -43,7 +43,9 @@ function renderMachineAssessment(ma){
   const label=rawLabel==='synthetic'?'SINTÉTICA / IA':(rawLabel==='real'?'REAL':'INDETERMINADA');
   const n=Number(ma.score_synthetic);
   const score=Number.isFinite(n)?`${(n*100).toFixed(2)}%`:'não disponível';
-  const scoreText=ma.calibrated?`probabilidade calibrada da classe sintética: ${score}`:`score da classe sintética: ${score}`;
+  let scoreText=`score da classe sintética: ${score}`;
+  if(ma.calibrated && ma.validated_for_input) scoreText=`probabilidade calibrada da classe sintética: ${score}`;
+  else if(ma.calibrated) scoreText=`score calibrado no domínio do modelo: ${score} (calibração não garantida para esta entrada)`;
   const scope=ma.validated_for_input?'entrada confirmada no domínio validado':'domínio de validação não confirmado para esta entrada';
   const model=ma.model_name?` Modelo: ${escapeHtml(ma.model_name)}.`:'';
   return `<div class="notice"><b>Classificação automática:</b> ${escapeHtml(label)} — ${escapeHtml(scoreText)}. ${escapeHtml(scope)}.${model}<br><small>Este voto computacional é separado da conclusão pericial e não constitui, isoladamente, prova de geração por IA.</small></div>`;
