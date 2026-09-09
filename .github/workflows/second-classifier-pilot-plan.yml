@@ -34,6 +34,14 @@ jobs:
           'Pillow>=10'
           'opencv-python-headless>=4.8,<5'
 
+      - name: Restore resumable Dataset Viewer page cache
+        uses: actions/cache@v4
+        with:
+          path: work/second_classifier/pilot-plan/cache
+          key: second-classifier-row-pages-${{ runner.os }}-${{ github.head_ref || github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            second-classifier-row-pages-${{ runner.os }}-${{ github.head_ref || github.ref_name }}-
+
       - name: Build deterministic 52k pilot plan
         env:
           PYTHONPATH: .
