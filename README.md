@@ -1,43 +1,63 @@
-# Media Forensics Lab (Python) - v0.8
+# Media Forensics Lab (Python) - v0.9
 
-Laboratório técnico e de pesquisa para análise reproduzível de integridade, proveniência, manipulação e mídia sintética/deepfake em imagens e vídeos. A v0.8 preserva a interface visual da v0.7 e acrescenta uma implementação nativa, independente e compatível com a metodologia espectral do **AutoGAN** para análise de artefatos de upsampling em GANs.
+Laboratório técnico e de pesquisa para análise reproduzível de integridade, proveniência, manipulação e mídia sintética/deepfake em imagens e vídeos. A v0.9 acrescenta um classificador automático `real`/`synthetic` calibrado e cientificamente escopado, preservando a separação entre **voto computacional** e **conclusão pericial**.
 
-> Regra central: nenhum escore, heurística, mapa, gráfico ou modelo isolado é convertido automaticamente em conclusão pericial. O MFLab separa observações de triagem, modelos validados, proveniência, artefatos derivados e interpretação especializada.
+> Regra central: nenhum escore, heurística, mapa, gráfico ou modelo isolado é convertido automaticamente em conclusão pericial. O MFLab separa observações de triagem, classificação automática, modelos validados dentro de um domínio declarado, proveniência, artefatos derivados e interpretação especializada.
 
-## Novidades da v0.8
+## Novidades da v0.9
 
-- nova análise `autogan_spectral`, baseada no método de Zhang, Karaman e Chang (WIFS 2019);
-- pré-processamento FFT por canal RGB com log-amplitude, normalização robusta P5/P95 e bandas `full`, `low`, `mid` e `high`;
-- descritores de energia por banda, autocorrelação de perfis e correlação entre quadrantes, mantidos como features descritivas sem limiar universal de fake/real;
-- feature bank sintético atualizado para `synthetic_handcrafted_v2`, incorporando as features AutoGAN-compatible;
-- adaptador opcional para checkpoint ResNet34 compatível com o detector AutoGAN, sem incluir pesos arbitrários no repositório;
-- metadados de validação/calibração permanecem obrigatórios para que um modelo deixe de ser apenas triagem;
-- cinco novos artefatos visuais por imagem quando aplicável: espectro completo, bandas low/mid/high e perfil espectral descritivo;
-- integração automática dessas figuras à aba **Gráficos e imagens** e ao **Apêndice A** do laudo, sem redesenhar a interface;
-- benchmark científico atualizado para `MFLAB-SCI-SYNTH-0.3`, incluindo features AutoGAN-compatible e avaliação separada de um checkpoint AutoGAN configurado;
-- protocolo de mídia sintética atualizado para `MFLAB-DF-0.6`;
-- schema técnico do relatório atualizado para `0.7`.
+- modelo embarcado `mflab_cifake_hgb_calibrated_v1`, treinado com o feature bank `synthetic_handcrafted_v2`;
+- classificador `HistGradientBoosting` calibrado por sigmoid/CV, exportado como bundle versionado;
+- `synthetic_ml` passa a usar o modelo embarcado por padrão, salvo override por `MFLAB_SYNTHETIC_MODEL`;
+- novo bloco `machine_assessment` no protocolo `MFLAB-DF-0.7`, contendo `label`, `score_synthetic`, threshold, calibração, modelo e escopo de validação;
+- a interface web exibe explicitamente **Classificação automática: REAL / SINTÉTICA-IA**, mantendo separadamente `evidentiary_conclusion`;
+- validação do bundle e validade para a entrada atual são conceitos separados: `bundle_validated` não implica automaticamente `validated_for_input`;
+- o examinador só confirma aplicabilidade ao domínio por `MFLAB_SYNTHETIC_MODEL_DOMAIN_CONFIRMED=1` quando houver justificativa documental para isso;
+- workflow reprodutível de treinamento/validação em CIFAKE, com holdout fresco, relatório JSON/Markdown e gráficos ROC, PR, matriz de confusão e calibração;
+- o modelo e seus metadados são empacotados com a distribuição.
+
+A v0.9 **não transforma o MFLab em um “oráculo de IA”**. O modelo embarcado é validado apenas no domínio documentado do CIFAKE e sua classificação permanece triagem fora desse domínio.
+
+## Base AutoGAN da v0.8
+
+A v0.8 introduziu:
+
+- análise `autogan_spectral`, baseada no método de Zhang, Karaman e Chang (WIFS 2019);
+- FFT por canal RGB com log-amplitude, normalização robusta P5/P95 e bandas `full`, `low`, `mid` e `high`;
+- descritores de energia por banda, autocorrelação de perfis e correlação entre quadrantes;
+- `synthetic_handcrafted_v2`, incorporando features AutoGAN-compatible;
+- adaptador opcional para checkpoint ResNet34 AutoGAN;
+- artefatos visuais AutoGAN integrados à aba **Gráficos e imagens** e ao **Apêndice A** do laudo.
 
 A implementação espectral é uma reprodução independente da metodologia publicada. O MFLab não depende do ambiente antigo do repositório AutoGAN para executar a análise nativa.
 
 ## Capacidades de mídia sintética/deepfake
 
-O protocolo `MFLAB-DF-0.6` combina:
+O protocolo `MFLAB-DF-0.7` combina:
 
 1. integridade e proveniência (SHA-256, C2PA, metadados);
 2. forense clássica (JPEG, ruído, resampling, PRNU-like, FFT etc.);
 3. triagem facial e consistência face-contexto;
 4. feature bank sintético (FFT + wavelet + HOG + RGB + GLCM/LBP + AutoGAN-compatible spectral descriptors);
 5. análise GAN-específica de artefatos espectrais de upsampling inspirada no AutoGAN;
-6. ML handcrafted opcional e explicitamente configurado;
-7. deep detector ONNX opcional e explicitamente configurado;
-8. checkpoint AutoGAN/ResNet34 opcional e explicitamente configurado;
+6. classificador ML handcrafted embarcado e calibrado, com domínio de validade explicitamente registrado;
+7. deep detector ONNX opcional;
+8. checkpoint AutoGAN/ResNet34 opcional;
 9. convergência entre famílias;
-10. conclusão automática preservada como `evidentiary_conclusion: inconclusive` salvo raciocínio pericial documentado fora do escore automático.
+10. `machine_assessment` para o voto computacional `real`/`synthetic`;
+11. `evidentiary_conclusion`, mantida separada e automaticamente `inconclusive` salvo raciocínio pericial documentado fora do escore automático.
 
-Um score de modelo só entra como evidência validada quando a configuração/documentação do bundle ou checkpoint o marca explicitamente como validado. Caso contrário permanece observação de triagem.
+A diferença é intencional:
 
-O AutoGAN é tratado como método de **GAN upsampling artifact detection**. Um resultado negativo não exclui geração por GAN e, sobretudo, não exclui diffusion ou outras famílias modernas de geração sintética.
+```text
+machine_assessment.label = synthetic
+        ≠
+evidentiary_conclusion = synthetic
+```
+
+O primeiro é uma classificação de máquina. O segundo é uma conclusão de valor pericial, que exige validade de domínio, convergência, proveniência e interpretação do caso.
+
+O AutoGAN continua sendo tratado como método de **GAN upsampling artifact detection**. Um resultado negativo não exclui geração por GAN e, sobretudo, não exclui diffusion ou outras famílias modernas de geração sintética.
 
 ## Instalação
 
@@ -54,6 +74,20 @@ pip install -r .\requirements.txt --trusted-host pypi.org --trusted-host files.p
 pip install -e . --no-deps --no-build-isolation
 ```
 
+O classificador CIFAKE v0.9 é instalado junto com o pacote e não exige variável de ambiente. Para substituir por outro bundle:
+
+```powershell
+$env:MFLAB_SYNTHETIC_MODEL="C:\modelos\detector.joblib"
+```
+
+Somente quando o examinador tiver fundamento para afirmar que a evidência pertence ao domínio de validação declarado do modelo:
+
+```powershell
+$env:MFLAB_SYNTHETIC_MODEL_DOMAIN_CONFIRMED="1"
+```
+
+Não use essa variável apenas porque a imagem possui a mesma resolução. Confirmação de domínio é uma decisão metodológica/documental, não um atalho para aumentar o peso de um score.
+
 Opcional para detector profundo ONNX:
 
 ```powershell
@@ -69,27 +103,7 @@ $env:MFLAB_AUTOGAN_CHECKPOINT="C:\modelos\autogan\checkpoint_10.pth"
 $env:MFLAB_AUTOGAN_FEATURE_MODE="full"
 ```
 
-Metadados opcionais do checkpoint podem ser fornecidos em um JSON lateral ou por:
-
-```powershell
-$env:MFLAB_AUTOGAN_METADATA="C:\modelos\autogan\checkpoint_10.json"
-```
-
-Exemplo de metadados:
-
-```json
-{
-  "model_name": "autogan_resnet34_fft",
-  "validated": false,
-  "calibrated": false,
-  "validation": {
-    "protocol": "MFLAB-SCI-SYNTH-0.3",
-    "report": "validation/scientific/autogan.json"
-  }
-}
-```
-
-Não marque `validated: true` apenas porque o modelo executa ou apresenta alta acurácia em um conjunto conhecido. A validação deve documentar domínio, splits independentes, FPR, sensibilidade, cross-generator/cross-family e robustez a pós-processamento.
+Metadados opcionais do checkpoint AutoGAN podem ser fornecidos por `MFLAB_AUTOGAN_METADATA`.
 
 Dependências de sistema recomendadas: `ffmpeg`/`ffprobe`, `exiftool` e `c2patool`.
 
@@ -103,6 +117,23 @@ mflab web
 ```
 
 A interface local permanece em `http://127.0.0.1:8765`.
+
+Para uma imagem, o bloco esperado passa a conter algo como:
+
+```json
+{
+  "machine_assessment": {
+    "status": "available",
+    "label": "synthetic",
+    "score_synthetic": 0.87,
+    "decision_threshold": 0.5,
+    "calibrated": true,
+    "validated_for_input": false,
+    "forensic_effect": "screening_only"
+  },
+  "evidentiary_conclusion": "inconclusive"
+}
+```
 
 ## Cases e artefatos visuais
 
@@ -138,7 +169,7 @@ case-2026-001/
 └── report.json
 ```
 
-No site, a aba **Resumo e métodos** mantém a experiência anterior e a aba **Gráficos e imagens** mostra a galeria derivada. No DOCX, as mesmas figuras são inseridas no **Apêndice A**, com legenda e limitação metodológica.
+No site, a aba **Resumo e métodos** mostra agora a classificação automática em bloco próprio, e a aba **Gráficos e imagens** continua exibindo a galeria derivada. A conclusão pericial automática continua apresentada separadamente.
 
 ## Validação nível 1 — CI/regressão
 
@@ -156,9 +187,15 @@ python -m pip check
 
 O GT canônico exige 100% de cobertura e 100% de aprovação dos checks obrigatórios da base controlada. Esse 100% é regressão de engenharia, não acurácia universal.
 
+<!-- CIFAKE_V09_START -->
+## Classificador automático embarcado e validação CIFAKE — v0.9
+
+Esta seção é atualizada automaticamente pelo workflow reprodutível de treinamento da v0.9 com as métricas do modelo exportado e os gráficos de validação.
+<!-- CIFAKE_V09_END -->
+
 ## Validação nível 2 — benchmark científico
 
-A validação científica usa datasets externos e explicitamente separados do CI. Exemplo de manifesto:
+A validação científica genérica continua disponível para datasets externos e explicitamente separados do CI. Exemplo de manifesto:
 
 ```csv
 path,label,generator,split,transform
@@ -177,16 +214,15 @@ mflab benchmark-synthetic .\benchmark\manifest.csv `
   --cross-generator
 ```
 
-O benchmark treina Logistic Regression, SVM-RBF, ExtraTrees e HistGradientBoosting sobre o feature bank ampliado, seleciona sem usar o test set final e registra desempenho global, por gerador, por transformação e leave-one-generator-out quando possível.
+O benchmark genérico treina Logistic Regression, SVM-RBF, ExtraTrees e HistGradientBoosting, seleciona sem usar o test set final e registra desempenho global, por gerador, por transformação e leave-one-generator-out quando possível.
 
-Se `MFLAB_AUTOGAN_CHECKPOINT` estiver configurado, o mesmo test set final também é usado para medir separadamente o checkpoint fixo AutoGAN-compatible, incluindo métricas globais e por gerador/transformação. Essa avaliação não treina o checkpoint no test set.
-
-O bundle handcrafted exportado é deliberadamente salvo com `validated: false`. Transformá-lo em modelo validado exige revisão do benchmark, splits independentes, ausência de leakage, cross-generator/cross-family, robustez a pós-processamento e critérios científicos documentados.
+O bundle genérico exportado por `benchmark-synthetic` continua deliberadamente salvo com `validated: false`. O único bundle embarcado marcado como validado na v0.9 é o modelo CIFAKE documentado nesta versão, e mesmo ele só é válido no domínio declarado.
 
 ## Separação metodológica
 
 - `dataset/demo` = regressão rápida e determinística do software;
 - datasets científicos externos = estimativa de desempenho;
+- `machine_assessment` = classificação automática computacional, não parecer;
 - `visuals/` = produtos derivados de inspeção, não um terceiro oráculo;
 - AutoGAN-compatible spectral analysis = família específica para artefatos de upsampling em GANs, não detector universal de IA;
 - validação cross-generator = treino em geradores conhecidos e teste em gerador não visto;
@@ -197,4 +233,4 @@ Nunca altere o ground truth apenas para fazer um detector passar.
 
 ## CI/CD e versionamento
 
-O projeto usa SemVer, GitHub Actions em Windows/Ubuntu e Python 3.10–3.12, gate de GT, package smoke e release por tag. Consulte `docs/CI_CD.md`, `docs/SCIENTIFIC_VALIDATION.md`, `docs/VISUAL_ARTIFACTS.md` e `docs/AUTOGAN_INTEGRATION.md`.
+O projeto usa SemVer, GitHub Actions em Windows/Ubuntu e Python 3.10–3.12, gate de GT, package smoke e release por tag. Consulte `docs/CI_CD.md`, `docs/SCIENTIFIC_VALIDATION.md`, `docs/VISUAL_ARTIFACTS.md`, `docs/AUTOGAN_INTEGRATION.md` e `docs/METHODS_MATHEMATICAL_COMPUTATIONAL.md`.
