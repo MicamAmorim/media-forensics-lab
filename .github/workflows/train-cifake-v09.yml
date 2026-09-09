@@ -1,0 +1,142 @@
+name: Train CIFAKE v0.9 bundled model
+
+on:
+  push:
+    branches:
+      - feat/v0.9-cifake-model
+    paths:
+      - requirements.txt
+      - pyproject.toml
+      - scripts/cifake_model_training.py
+      - .github/workflows/train-cifake-v09.yml
+  workflow_dispatch:
+    inputs:
+      commit_results:
+        description: "Commit regenerated model/results back to the selected branch"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  PYTHONUNBUFFERED: "1"
+  TRAIN_URL: https://huggingface.co/datasets/dragonintelligence/CIFAKE-image-dataset/resolve/main/data/train-00000-of-00001.parquet?download=true
+  TEST_URL: https://huggingface.co/datasets/dragonintelligence/CIFAKE-image-dataset/resolve/main/data/test-00000-of-00001.parquet?download=true
+  TRAIN_SHA256: c906031ad6ac44c7d0fc21e8f9315d85cf351540b6517bd6c0de3ee2f884021b
+  TEST_SHA256: 7767d5285d009471175ac7985c60367d82a34088f29c67185da7af2c53b7975d
+  MFLAB_BASE_SHA: 0285b6cfad137db552dfbf8a5158c14d26791822
+
+jobs:
+  extract-features:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install MFLab and benchmark dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pip install pyarrow
+      - name: Download and verify CIFAKE parquet files
+        run: |
+          mkdir -p /tmp/cifake-data
+          curl -L --retry 5 --fail "$TRAIN_URL" -o /tmp/cifake-data/train.parquet
+          curl -L --retry 5 --fail "$TEST_URL" -o /tmp/cifake-data/test.parquet
+          echo "$TRAIN_SHA256  /tmp/cifake-data/train.parquet" | sha256sum -c -
+          echo "$TEST_SHA256  /tmp/cifake-data/test.parquet" | sha256sum -c -
+      - name: Extract full CIFAKE v0.9 feature bank
+        run: |
+          python scripts/cifake_model_training.py extract \
+            --train-parquet /tmp/cifake-data/train.parquet \
+            --test-parquet /tmp/cifake-data/test.parquet \
+            --out validation/cifake-v09-features-${{ matrix.shard }}.npz \
+            --shard ${{ matrix.shard }} --shards 4 --workers 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cifake-v09-features-${{ matrix.shard }}
+          path: validation/cifake-v09-features-${{ matrix.shard }}.npz
+          retention-days: 7
+
+  train-export:
+    needs: extract-features
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install model/runtime dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cifake-v09-features-*
+          path: validation/shards
+          merge-multiple: true
+      - name: Train, calibrate, validate and export bundled model
+        run: |
+          python scripts/cifake_model_training.py train \
+            --features-glob 'validation/shards/cifake-v09-features-*.npz' \
+            --model-out mf_lab/models/mflab_cifake_hgb_calibrated_v1.joblib \
+            --model-metadata mf_lab/models/mflab_cifake_hgb_calibrated_v1.json \
+            --result-json validation/scientific/CIFAKE_V09_RESULT.json \
+            --result-markdown validation/scientific/CIFAKE_V09_RESULT.md \
+            --graph-dir docs/assets/validation \
+            --readme README.md \
+            --seed 20260909 \
+            --mflab-base-sha "$MFLAB_BASE_SHA" \
+            --train-sha256 "$TRAIN_SHA256" \
+            --test-sha256 "$TEST_SHA256"
+      - name: Smoke-test bundled model
+        run: |
+          python scripts/check_version.py
+          python - <<'PY'
+          import joblib
+          from pathlib import Path
+          p = Path('mf_lab/models/mflab_cifake_hgb_calibrated_v1.joblib')
+          bundle = joblib.load(p)
+          assert bundle['validated'] is True
+          assert bundle['calibrated'] is True
+          assert len(bundle['feature_names']) == 73
+          assert bundle['validation']['fresh_holdout_count'] == 10000
+          print(bundle['model_name'])
+          PY
+      - name: Commit regenerated model and validation evidence
+        if: ${{ github.event_name == 'push' || inputs.commit_results }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md mf_lab/models docs/assets/validation validation/scientific
+          git status --short
+          git diff --cached --quiet && exit 0
+          git commit -m "validation: regenerate CIFAKE v0.9 model"
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
+          git push origin HEAD:${GITHUB_REF_NAME}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mflab-cifake-v09-model-and-validation
+          path: |
+            mf_lab/models/mflab_cifake_hgb_calibrated_v1.joblib
+            mf_lab/models/mflab_cifake_hgb_calibrated_v1.json
+            validation/scientific/CIFAKE_V09_RESULT.json
+            validation/scientific/CIFAKE_V09_RESULT.md
+            docs/assets/validation/*.png
+          retention-days: 30

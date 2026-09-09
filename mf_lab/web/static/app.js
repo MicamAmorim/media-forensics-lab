@@ -35,10 +35,26 @@ function renderMethods(methods){
   return `<div class="method-list">${methods.map(m=>`<div class="method"><button type="button"><span>${escapeHtml(m.name)}</span><span class="method-state">${m.status==='error'?'erro':'detalhes'} ▾</span></button><div class="method-detail">${escapeHtml(m.summary)}</div></div>`).join('')}</div>`;
 }
 
+function renderMachineAssessment(ma){
+  if(!ma || ma.status!=='available'){
+    return `<div class="notice"><b>Classificação automática IA/Real:</b> indisponível nesta execução.</div>`;
+  }
+  const rawLabel=String(ma.label||'indeterminado').toLowerCase();
+  const label=rawLabel==='synthetic'?'SINTÉTICA / IA':(rawLabel==='real'?'REAL':'INDETERMINADA');
+  const n=Number(ma.score_synthetic);
+  const score=Number.isFinite(n)?`${(n*100).toFixed(2)}%`:'não disponível';
+  let scoreText=`score da classe sintética: ${score}`;
+  if(ma.calibrated && ma.validated_for_input) scoreText=`probabilidade calibrada da classe sintética: ${score}`;
+  else if(ma.calibrated) scoreText=`score calibrado no domínio do modelo: ${score} (calibração não garantida para esta entrada)`;
+  const scope=ma.validated_for_input?'entrada confirmada no domínio validado':'domínio de validação não confirmado para esta entrada';
+  const model=ma.model_name?` Modelo: ${escapeHtml(ma.model_name)}.`:'';
+  return `<div class="notice"><b>Classificação automática:</b> ${escapeHtml(label)} — ${escapeHtml(scoreText)}. ${escapeHtml(scope)}.${model}<br><small>Este voto computacional é separado da conclusão pericial e não constitui, isoladamente, prova de geração por IA.</small></div>`;
+}
+
 function renderFiles(files){
   $('#fileResults').innerHTML = files.map((f,i)=>{
     const review=f.triage_assessment==='needs_expert_review';
-    return `<article class="file-card"><div class="preview"><span class="file-badge">#${String(i+1).padStart(2,'0')}</span><img src="${f.preview_url}" alt="Prévia de ${escapeHtml(f.name)}" loading="lazy"></div><div class="file-content"><div class="file-head"><div><h3>${escapeHtml(f.name)}</h3><div class="hash">SHA-256 ${escapeHtml(f.sha256||'')}</div></div><span class="status ${review?'review':'ok'}">${review?'revisão recomendada':'triagem registrada'}</span></div><div class="mini-chart">${bars(f.signal_counts)}</div><div class="notice"><b>Conclusão automática:</b> ${escapeHtml(String(f.evidentiary_conclusion||'inconclusivo'))}. Perfil: ${escapeHtml(f.profile||'')}.</div>${renderMethods(f.methods)}</div></article>`;
+    return `<article class="file-card"><div class="preview"><span class="file-badge">#${String(i+1).padStart(2,'0')}</span><img src="${f.preview_url}" alt="Prévia de ${escapeHtml(f.name)}" loading="lazy"></div><div class="file-content"><div class="file-head"><div><h3>${escapeHtml(f.name)}</h3><div class="hash">SHA-256 ${escapeHtml(f.sha256||'')}</div></div><span class="status ${review?'review':'ok'}">${review?'revisão recomendada':'triagem registrada'}</span></div><div class="mini-chart">${bars(f.signal_counts)}</div>${renderMachineAssessment(f.machine_assessment)}<div class="notice"><b>Conclusão automática de valor probatório:</b> ${escapeHtml(String(f.evidentiary_conclusion||'inconclusivo'))}. Perfil: ${escapeHtml(f.profile||'')}.</div>${renderMethods(f.methods)}</div></article>`;
   }).join('');
   document.querySelectorAll('.method button').forEach(btn=>btn.addEventListener('click',()=>btn.parentElement.classList.toggle('open')));
 }

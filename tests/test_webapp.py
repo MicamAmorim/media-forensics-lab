@@ -41,14 +41,25 @@ def test_multi_image_upload_download_links_and_artifacts(monkeypatch, tmp_path):
                 "file": str(p),
                 "sha256": "a" * 64,
                 "size_bytes": p.stat().st_size,
-                "analyzed_at": "2026-09-08T00:00:00+00:00",
+                "analyzed_at": "2026-09-09T00:00:00+00:00",
                 "profile": profile,
                 "methods": {
                     "copy_move_orb": {"suspicious_cluster_count": 1, "suspicious_pairs": 12, "score": .6},
                     "deepfake_protocol": {
+                        "protocol_version": "MFLAB-DF-0.7",
                         "triage_assessment": "screening_observations_only",
                         "evidentiary_conclusion": "inconclusive",
                         "screening_observations": [],
+                        "machine_assessment": {
+                            "status": "available",
+                            "label": "synthetic",
+                            "score_synthetic": 0.81,
+                            "decision_threshold": 0.5,
+                            "calibrated": True,
+                            "validated_for_input": False,
+                            "forensic_effect": "screening_only",
+                            "model_name": "mflab_cifake_hgb_calibrated_v1",
+                        },
                     },
                 },
                 "visual_artifacts": {
@@ -91,6 +102,8 @@ def test_multi_image_upload_download_links_and_artifacts(monkeypatch, tmp_path):
     assert payload["downloads"]["docx"].endswith("/download/docx")
     assert len(payload["files"]) == 2
     assert payload["files"][0]["artifact_count"] == 1
+    assert payload["files"][0]["machine_assessment"]["label"] == "synthetic"
+    assert payload["files"][0]["machine_assessment"]["validated_for_input"] is False
     artifact_url = payload["files"][0]["artifacts"][0]["url"]
     served = client.get(artifact_url)
     assert served.status_code == 200

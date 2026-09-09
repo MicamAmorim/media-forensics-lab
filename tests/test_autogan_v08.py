@@ -64,10 +64,12 @@ def test_pipeline_exposes_autogan_and_visual_artifacts(tmp_path, monkeypatch):
     from mf_lab.pipeline import analyze_file
 
     monkeypatch.delenv("MFLAB_AUTOGAN_CHECKPOINT", raising=False)
+    monkeypatch.delenv("MFLAB_SYNTHETIC_MODEL_DOMAIN_CONFIRMED", raising=False)
     r = analyze_file(D / "img_001_pristine.jpg", tmp_path, profile="deepfake")
     assert r["schema_version"] == "0.7"
     assert r["methods"]["autogan_spectral"]["status"] == "success"
     assert r["methods"]["autogan_classifier"]["status"] == "not_configured"
-    assert r["methods"]["deepfake_protocol"]["protocol_version"] == "MFLAB-DF-0.6"
+    assert r["methods"]["deepfake_protocol"]["protocol_version"] == "MFLAB-DF-0.7"
+    assert r["methods"]["deepfake_protocol"]["machine_assessment"]["status"] == "available"
     ids = {x["id"] for x in r["visual_artifacts"]["items"]}
     assert {"autogan_fft_full", "autogan_fft_low", "autogan_fft_mid", "autogan_fft_high", "autogan_spectral_profile"}.issubset(ids)
