@@ -29,6 +29,7 @@ from mf_lab.analysis.synthetic_deep import score_synthetic_onnx
 from mf_lab.analysis.synthetic_features import extract_synthetic_feature_bank
 from mf_lab.analysis.synthetic_ml import score_synthetic_ml
 from mf_lab.analysis.video import frame_hash_duplicates, frame_timing, frame_transition_anomalies, motion_discontinuity_screen
+from mf_lab.autogan_visuals import generate_autogan_visual_artifacts
 from mf_lab.integrations.autogan import score_autogan_checkpoint, status as autogan_status
 from mf_lab.integrations.external import load_case_external_models
 from mf_lab.integrations.veritas import run_all as run_veritas_all, status as veritas_status
@@ -98,6 +99,23 @@ def _safe_method(methods: dict, name: str, fn, *args, **kwargs) -> None:
         methods[name] = fn(*args, **kwargs)
     except Exception as e:
         methods[name] = {"status": "error", "error": repr(e)}
+
+
+def _merge_visual_artifacts(base: dict, extra: dict) -> dict:
+    if not isinstance(base, dict):
+        base = {"status": "no_artifacts", "artifact_count": 0, "items": [], "errors": []}
+    base.setdefault("items", [])
+    base.setdefault("errors", [])
+    base["items"].extend(extra.get("items") or [])
+    base["errors"].extend(extra.get("errors") or [])
+    base["artifact_count"] = len(base["items"])
+    if base["items"]:
+        base["status"] = "success"
+    base["autogan"] = {
+        "status": extra.get("status"),
+        "artifact_count": int(extra.get("artifact_count", 0) or 0),
+    }
+    return base
 
 
 def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
@@ -179,9 +197,11 @@ def analyze_file(path: str | Path, out_dir: str | Path, profile: str = "full",
     report["method_registry"] = {k: METHODS[k] for k in m if k in METHODS}
     visual_root = Path(case_dir) if case_dir is not None else out
     try:
-        report["visual_artifacts"] = generate_visual_artifacts(
-            path, visual_root, m, reference_path=reference_path
-        )
+        visuals = generate_visual_artifacts(path, visual_root, m, reference_path=reference_path)
+        if is_image and isinstance(m.get("autogan_spectral"), dict):
+            autogan_visuals = generate_autogan_visual_artifacts(path, visual_root, m.get("autogan_spectral") or {})
+            visuals = _merge_visual_artifacts(visuals, autogan_visuals)
+        report["visual_artifacts"] = visuals
     except Exception as e:
         report["visual_artifacts"] = {
             "status": "error",
