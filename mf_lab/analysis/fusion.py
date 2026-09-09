@@ -26,10 +26,20 @@ def synthetic_evidence_fusion(methods: dict) -> dict:
         families.append("validated_provenance")
         notes.append("C2PA cryptographic validation is provenance evidence, not pixel-classifier evidence.")
 
-    for key, family in (("synthetic_ml", "handcrafted_ml"), ("synthetic_deep", "deep_model")):
+    for key, family in (
+        ("synthetic_ml", "handcrafted_ml"),
+        ("synthetic_deep", "deep_model"),
+        ("autogan_classifier", "autogan_spectral_model"),
+    ):
         r = methods.get(key) or {}
         if r.get("status") == "success" and r.get("validated") is True:
             families.append(family)
+
+    autogan = methods.get("autogan_spectral") or {}
+    if autogan.get("status") == "success":
+        notes.append(
+            "AutoGAN-compatible descriptors target GAN upsampling artifacts. Their execution alone is descriptive and does not create an independent evidence family."
+        )
 
     independent = sorted(set(families))
     if len(independent) >= 4:
