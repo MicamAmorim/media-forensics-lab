@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops, hog, local_binary_pattern
 
+from mf_lab.analysis.autogan_spectral import autogan_spectral_analysis
 from mf_lab.utils.io import cv_imread
 
 
@@ -95,8 +96,9 @@ def _hog_summary(gray: np.ndarray) -> dict[str, float]:
 def extract_synthetic_feature_bank(path: str | Path) -> dict:
     """Extract explainable handcrafted features for synthetic-media research.
 
-    The feature bank is intentionally descriptive. It becomes a classifier only
-    when paired with a separately trained/validated model bundle.
+    v2 extends the original MFLab bank with clean-room AutoGAN-compatible
+    spectral descriptors. The feature bank remains descriptive until paired with
+    a separately trained and scientifically validated classifier.
     """
     rgb = _read_rgb(path)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
@@ -129,11 +131,19 @@ def extract_synthetic_feature_bank(path: str | Path) -> dict:
         features[f"{name}_std"] = sd
         features[f"{name}_skew"] = float(np.mean(((ch - mu) / (sd + 1e-12)) ** 3))
 
+    autogan = autogan_spectral_analysis(path)
+    autogan_features = autogan.get("features") or {}
+    features.update({k: float(v) for k, v in autogan_features.items()})
+
     return {
         "status": "success",
-        "feature_family": "synthetic_handcrafted_v1",
+        "feature_family": "synthetic_handcrafted_v2",
         "feature_count": len(features),
         "features": features,
+        "feature_sources": {
+            "mflab_classical_synthetic": len(features) - len(autogan_features),
+            "autogan_compatible_spectral": len(autogan_features),
+        },
         "calibrated": False,
-        "warning": "Feature extraction is descriptive. Do not interpret any single feature as a probability of AI generation.",
+        "warning": "Feature extraction is descriptive. AutoGAN-compatible descriptors target GAN upsampling artifacts and no single feature is a probability of AI generation.",
     }
