@@ -1,0 +1,95 @@
+name: Scientific CIFAKE validation
+
+on:
+  push:
+    branches:
+      - validation/cifake-v0.8
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  MFLAB_BASE_SHA: 0285b6cfad137db552dfbf8a5158c14d26791822
+  TRAIN_URL: https://huggingface.co/datasets/dragonintelligence/CIFAKE-image-dataset/resolve/main/data/train-00000-of-00001.parquet?download=true
+  TEST_URL: https://huggingface.co/datasets/dragonintelligence/CIFAKE-image-dataset/resolve/main/data/test-00000-of-00001.parquet?download=true
+  TRAIN_SHA256: c906031ad6ac44c7d0fc21e8f9315d85cf351540b6517bd6c0de3ee2f884021b
+  TEST_SHA256: 7767d5285d009471175ac7985c60367d82a34088f29c67185da7af2c53b7975d
+
+jobs:
+  extract-features:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install MFLab and benchmark dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pip install pyarrow
+      - name: Download CIFAKE parquet files
+        run: |
+          mkdir -p validation/cifake-data
+          curl -L --retry 5 --fail "$TRAIN_URL" -o validation/cifake-data/train.parquet
+          curl -L --retry 5 --fail "$TEST_URL" -o validation/cifake-data/test.parquet
+          echo "$TRAIN_SHA256  validation/cifake-data/train.parquet" | sha256sum -c -
+          echo "$TEST_SHA256  validation/cifake-data/test.parquet" | sha256sum -c -
+      - name: Extract v0.8 MFLab features
+        run: |
+          python scripts/cifake_validation_runner.py extract \
+            --train-parquet validation/cifake-data/train.parquet \
+            --test-parquet validation/cifake-data/test.parquet \
+            --out validation/cifake-features-${{ matrix.shard }}.npz \
+            --shard ${{ matrix.shard }} --shards 4 \
+            --train-per-class 10000 \
+            --test-per-class 10000 \
+            --seed 20260908 \
+            --workers 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cifake-features-${{ matrix.shard }}
+          path: validation/cifake-features-${{ matrix.shard }}.npz
+          retention-days: 7
+
+  evaluate:
+    needs: extract-features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install evaluation dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps --no-build-isolation
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cifake-features-*
+          path: validation/shards
+          merge-multiple: true
+      - name: Evaluate held-out CIFAKE test set and ablations
+        run: |
+          python scripts/cifake_validation_runner.py evaluate \
+            --features-glob 'validation/shards/cifake-features-*.npz' \
+            --out validation/CIFAKE_V08_RESULT.json \
+            --markdown validation/CIFAKE_V08_RESULT.md \
+            --seed 20260908
+          cat validation/CIFAKE_V08_RESULT.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cifake-v0.8-scientific-validation
+          path: |
+            validation/CIFAKE_V08_RESULT.json
+            validation/CIFAKE_V08_RESULT.md
+          retention-days: 30
