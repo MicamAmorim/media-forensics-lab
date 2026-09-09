@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 
 from mf_lab.pipeline import IMAGE_EXTS, PROFILES, analyze_case
 from mf_lab.report.generator import generate_preliminary_report
+from mf_lab.version import current_version
 
 
 RUN_ROOT = Path(tempfile.gettempdir()) / "mflab-web-runs"
@@ -52,46 +53,30 @@ def _numeric(value, default=0.0) -> float:
 
 
 def _signal_counts(methods: dict) -> dict[str, int]:
-    """Build visualization-only counts from native screening outputs.
-
-    Counts intentionally do not represent probabilities, calibrated confidence or
-    evidentiary weight. They only summarize how many screening indicators were
-    emitted by each family for the interactive view.
-    """
-    local = 0
-    compression = 0
-    resampling = 0
-    sensor = 0
-    synthetic = 0
-    provenance = 0
-
+    local = compression = resampling = sensor = synthetic = provenance = 0
     cm = methods.get("copy_move_orb") or {}
     local += int(_numeric(cm.get("suspicious_cluster_count"), 0) > 0)
-
     dct = methods.get("jpeg_dct") or {}
     compression += int(_numeric(dct.get("score"), 0) >= 0.10)
     ghost = methods.get("jpeg_ghost") or {}
     compression += int(bool(ghost.get("suspicious_qualities") or ghost.get("candidates")))
-
     rs = methods.get("resampling") or {}
     resampling += int(rs.get("screening_flag") is True)
-
     nm = methods.get("noise_map") or {}
     sensor += len(nm.get("screening_flags") or [])
     prnu = methods.get("prnu_screen") or {}
     sensor += len(prnu.get("screening_flags") or [])
-
     face = methods.get("face_artifacts") or {}
     synthetic += len(face.get("screening_flags") or [])
+    context = methods.get("face_context_consistency") or {}
+    synthetic += len(context.get("screening_flags") or [])
     spectral = methods.get("synthetic_spectral") or {}
     synthetic += len(spectral.get("screening_flags") or [])
     proto = methods.get("deepfake_protocol") or methods.get("video_deepfake_protocol") or {}
     synthetic += len(proto.get("screening_observations") or [])
     synthetic += len(proto.get("evidence_families") or [])
-
     c2pa = methods.get("c2pa") or {}
     provenance += int(bool(c2pa.get("manifest") or c2pa.get("has_manifest") or c2pa.get("markers_found")))
-
     return {
         "Manipulação local": local,
         "Compressão/JPEG": compression,
@@ -107,23 +92,12 @@ def _method_summary(name: str, result) -> dict:
         return {"name": name, "status": "ok", "summary": str(result)}
     if result.get("status") == "error":
         return {"name": name, "status": "error", "summary": result.get("error", "erro")}
-
     interesting_keys = (
-        "score",
-        "screening_flag",
-        "screening_flags",
-        "suspicious_pairs",
-        "suspicious_cluster_count",
-        "dominant_translation_px",
-        "duplicate_count",
-        "adjacent_near_duplicates",
-        "anomaly_count",
-        "triage_assessment",
-        "evidentiary_conclusion",
-        "validated_external_models",
-        "protocol_version",
-        "cryptographically_validated",
-        "markers_found",
+        "score", "score_synthetic", "predicted_label", "screening_flag", "screening_flags",
+        "suspicious_pairs", "suspicious_cluster_count", "dominant_translation_px", "duplicate_count",
+        "adjacent_near_duplicates", "anomaly_count", "triage_assessment", "evidentiary_conclusion",
+        "validated_external_models", "protocol_version", "cryptographically_validated", "markers_found",
+        "feature_count", "convergence_level", "family_count", "validated", "calibrated",
     )
     picked = {k: result.get(k) for k in interesting_keys if k in result}
     if not picked:
@@ -142,42 +116,23 @@ def _serialize_report(run_id: str, report: dict) -> dict:
     conclusion = proto.get("evidentiary_conclusion", "inconclusivo") if isinstance(proto, dict) else "inconclusivo"
     signal_counts = _signal_counts(methods)
     return {
-        "name": name,
-        "sha256": report.get("sha256"),
-        "size_bytes": report.get("size_bytes"),
-        "analyzed_at": report.get("analyzed_at"),
-        "profile": report.get("profile"),
-        "triage_assessment": triage,
-        "evidentiary_conclusion": conclusion,
-        "signal_counts": signal_counts,
-        "signal_total": sum(signal_counts.values()),
+        "name": name, "sha256": report.get("sha256"), "size_bytes": report.get("size_bytes"),
+        "analyzed_at": report.get("analyzed_at"), "profile": report.get("profile"),
+        "triage_assessment": triage, "evidentiary_conclusion": conclusion,
+        "signal_counts": signal_counts, "signal_total": sum(signal_counts.values()),
         "preview_url": f"/api/run/{run_id}/media/{name}",
         "methods": [_method_summary(k, v) for k, v in methods.items()],
     }
 
 
 def _write_case_yaml(case_dir: Path, case_id: str) -> None:
-    payload = {
-        "case": {
-            "id": case_id,
-            "title": "Análise interativa de mídia digital",
-            "process_number": "",
-            "court": "",
-            "expert": {"name": "[NOME DO PERITO]", "qualification": "[QUALIFICAÇÃO]"},
-            "scope": (
-                "Triagem técnico-forense automatizada de arquivos de mídia, com preservação de hash, "
-                "métodos de análise nativos do MFLab e ressalva de que sinais automatizados não constituem "
-                "veredito isolado de autenticidade, manipulação ou geração sintética."
-            ),
-            "questions": [
-                "Há sinais técnicos que justifiquem revisão pericial aprofundada?",
-                "Há sinais compatíveis com manipulação local ou mídia sintética?",
-            ],
-        }
-    }
-    (case_dir / "case.yaml").write_text(
-        yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8"
-    )
+    payload = {"case": {
+        "id": case_id, "title": "Análise interativa de mídia digital", "process_number": "", "court": "",
+        "expert": {"name": "[NOME DO PERITO]", "qualification": "[QUALIFICAÇÃO]"},
+        "scope": "Triagem técnico-forense automatizada de arquivos de mídia, com preservação de hash, métodos de análise nativos do MFLab e ressalva de que sinais automatizados não constituem veredito isolado de autenticidade, manipulação ou geração sintética.",
+        "questions": ["Há sinais técnicos que justifiquem revisão pericial aprofundada?", "Há sinais compatíveis com manipulação local ou mídia sintética?"],
+    }}
+    (case_dir / "case.yaml").write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
 
 def create_app() -> Flask:
@@ -193,7 +148,7 @@ def create_app() -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify({"status": "ok", "app": "MFLab Interactive Report", "version": "0.5.0"})
+        return jsonify({"status": "ok", "app": "MFLab Interactive Report", "version": current_version()})
 
     @app.post("/api/analyze")
     def analyze():
@@ -202,20 +157,16 @@ def create_app() -> Flask:
             return jsonify({"error": "Selecione pelo menos uma imagem."}), 400
         if len(uploads) > MAX_FILES:
             return jsonify({"error": f"Máximo de {MAX_FILES} arquivos por execução."}), 400
-
         profile = request.form.get("profile", "full")
         if profile not in PROFILES:
             return jsonify({"error": "Perfil de análise inválido."}), 400
-
         run_id = "web-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8]
         case_dir = RUN_ROOT / run_id
         original = case_dir / "original"
         for sub in ("original", "working", "results", "logs", "final"):
             (case_dir / sub).mkdir(parents=True, exist_ok=True)
         _write_case_yaml(case_dir, run_id)
-
-        accepted = []
-        rejected = []
+        accepted, rejected = [], []
         for upload in uploads:
             if not upload.filename:
                 continue
@@ -226,43 +177,26 @@ def create_app() -> Flask:
             name = _unique_name(original, upload.filename)
             upload.save(original / name)
             accepted.append(name)
-
         if not accepted:
             shutil.rmtree(case_dir, ignore_errors=True)
             return jsonify({"error": "Nenhuma imagem suportada foi recebida.", "rejected": rejected}), 400
-
         reports = analyze_case(case_dir, profile=profile, run_veritas=False)
         if not reports:
             return jsonify({"error": "O pipeline não produziu relatórios.", "run_id": run_id}), 500
-
         docx_path = generate_preliminary_report(case_dir, "docx")
         md_path = generate_preliminary_report(case_dir, "md")
         serialized = [_serialize_report(run_id, r) for r in reports]
-        return jsonify(
-            {
-                "run_id": run_id,
-                "profile": profile,
-                "accepted": accepted,
-                "rejected": rejected,
-                "files": serialized,
-                "summary": {
-                    "files": len(serialized),
-                    "screening_signals": sum(x["signal_total"] for x in serialized),
-                    "needs_review": sum(x["triage_assessment"] == "needs_expert_review" for x in serialized),
-                    "inconclusive": sum(str(x["evidentiary_conclusion"]).lower() in {"inconclusive", "inconclusivo"} for x in serialized),
-                },
-                "downloads": {
-                    "docx": f"/api/run/{run_id}/download/docx",
-                    "md": f"/api/run/{run_id}/download/md",
-                    "json": f"/api/run/{run_id}/download/json",
-                },
-                "generated": {"docx": Path(docx_path).name, "md": Path(md_path).name},
-                "warning": (
-                    "Os gráficos resumem indicadores de triagem e não representam probabilidade de falsificação, "
-                    "peso de evidência ou conclusão pericial automática."
-                ),
-            }
-        )
+        return jsonify({
+            "run_id": run_id, "profile": profile, "accepted": accepted, "rejected": rejected, "files": serialized,
+            "summary": {
+                "files": len(serialized), "screening_signals": sum(x["signal_total"] for x in serialized),
+                "needs_review": sum(x["triage_assessment"] == "needs_expert_review" for x in serialized),
+                "inconclusive": sum(str(x["evidentiary_conclusion"]).lower() in {"inconclusive", "inconclusivo"} for x in serialized),
+            },
+            "downloads": {"docx": f"/api/run/{run_id}/download/docx", "md": f"/api/run/{run_id}/download/md", "json": f"/api/run/{run_id}/download/json"},
+            "generated": {"docx": Path(docx_path).name, "md": Path(md_path).name},
+            "warning": "Os gráficos resumem indicadores de triagem e não representam probabilidade de falsificação, peso de evidência ou conclusão pericial automática.",
+        })
 
     def _case_or_404(run_id: str) -> Path:
         case_dir = RUN_ROOT / secure_filename(run_id)
@@ -273,15 +207,13 @@ def create_app() -> Flask:
     @app.get("/api/run/<run_id>/media/<path:filename>")
     def media(run_id: str, filename: str):
         case_dir = _case_or_404(run_id)
-        safe = secure_filename(Path(filename).name)
-        return send_from_directory(case_dir / "original", safe, conditional=True)
+        return send_from_directory(case_dir / "original", secure_filename(Path(filename).name), conditional=True)
 
     @app.get("/api/run/<run_id>/download/<kind>")
     def download(run_id: str, kind: str):
         case_dir = _case_or_404(run_id)
         if kind == "json":
-            path = case_dir / "report.json"
-            mimetype = "application/json"
+            path, mimetype = case_dir / "report.json", "application/json"
         elif kind == "docx":
             matches = sorted((case_dir / "final").glob("*_laudo_preliminar.docx"))
             path = matches[0] if matches else Path(generate_preliminary_report(case_dir, "docx"))
@@ -305,5 +237,4 @@ def create_app() -> Flask:
 
 
 def run_web(host: str = "127.0.0.1", port: int = 8765, debug: bool = False) -> None:
-    app = create_app()
-    app.run(host=host, port=port, debug=debug, use_reloader=debug)
+    create_app().run(host=host, port=port, debug=debug, use_reloader=debug)

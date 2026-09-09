@@ -1,109 +1,81 @@
-# MFLab Deepfake / Synthetic Media Protocol — MFLAB-DF-0.4
+# MFLab Deepfake / Synthetic Media Protocol — MFLAB-DF-0.5
 
-The protocol deliberately avoids a single "AI probability". A forensic conclusion should be based on provenance, file/encoding history, classical image/video forensics, validated learned detectors, and human review.
+O protocolo evita uma única “probabilidade de IA”. A conclusão pericial deve combinar proveniência, histórico de codificação, análise clássica, features específicas de mídia sintética, modelos validados e revisão humana.
 
-## Stage 0 — Preservation and question definition
+## Stage 0 — preservação e pergunta
 
-1. Preserve original bytes and compute SHA-256.
-2. Record source, transfer path, acquisition time and who handled the file.
-3. Define the actual question: full synthetic image, face swap, reenactment, local generative edit, or ordinary editing.
+1. preservar os bytes originais e calcular SHA-256;
+2. registrar origem, transferência, aquisição e cadeia de custódia;
+3. definir o problema: imagem integralmente sintética, face replacement/deepfake facial, vídeo manipulado, edição generativa local ou edição convencional.
 
-## Stage 1 — Provenance
+## Stage 1 — proveniência
 
-- C2PA / Content Credentials when present (`c2patool`).
-- Original-source comparison and known-device samples when available.
-- Metadata consistency is supporting evidence only.
+- C2PA/Content Credentials com `c2patool` quando disponível;
+- comparação com arquivo/dispositivo fonte quando possível;
+- metadados como evidência auxiliar, nunca como prova isolada.
 
-## Stage 2 — Encoding and classical media forensics
+## Stage 2 — forense clássica
 
-- JPEG quantization / recompression / ghost screening.
-- Histogram and noise-residual consistency.
-- Copy-move, resampling and frequency-domain screening.
-- PRNU-like residual screening; camera identification requires a calibrated multi-reference PRNU/PCE procedure.
-- For video: container/codec, GOP/timestamps, missing/duplicated frames and transcode history.
+- JPEG quantization, double JPEG/DCT e JPEG Ghost;
+- ELA, histogramas e consistência de ruído;
+- copy-move, resampling e domínio de frequência;
+- residual PRNU-like apenas como triagem;
+- vídeo: container/codec, timestamps/GOP, duplicações, transições e fluxo óptico;
+- comparação assistida por referência quando uma referência confiável existe.
 
-## Stage 3 — Synthetic/deepfake screening
+## Stage 3 — features específicas de mídia sintética
 
-### Still images
+A v0.5 adiciona um banco explicável `synthetic_handcrafted_v1` com:
 
-- Spectral radial-profile / periodicity features.
-- Face-region texture, boundary and luminance measurements when a face is present.
-- Local noise/resampling/sensor-residual inconsistencies.
+- FFT multibanda e razão alta/baixa frequência;
+- energia Haar-wavelet em múltiplas escalas;
+- HOG;
+- correlações RGB;
+- GLCM;
+- LBP uniforme;
+- momentos de cor.
 
-### Video
+Essas features são descritivas. Não existe um limiar universal que transforme uma feature em “imagem IA”.
 
-- Sampled face texture/luminance consistency.
-- Sampled frequency consistency.
-- Temporal structure and duplicate/gap analysis.
+Para faces, o protocolo mantém métricas faciais e adiciona comparação face-contexto de textura/ruído/sharpness. Essa comparação é não específica e pode ser afetada por iluminação, maquiagem, profundidade de campo, câmera e compressão.
 
-These native modules are **screening only**. In v0.4 their outputs are stored as `screening_observations`; because they are not calibrated to a target population/domain, they do **not** by themselves trigger `needs_expert_review` as deepfake evidence and do not produce an evidentiary AI probability.
+## Stage 4 — ML handcrafted
 
-## Stage 4 — Validated learned detectors
+O MFLab pode carregar um bundle Joblib por `MFLAB_SYNTHETIC_MODEL`. O bundle deve declarar `feature_names`, `estimator`, `model_name`, `calibrated`, `validated` e metadados de validação.
 
-Preferred workflow:
+O MFLab não marca automaticamente bundles treinados localmente como validados. O benchmark científico exporta `validated: false` por padrão.
 
-1. Run more than one detector family using a benchmarked framework such as DeepfakeBench.
-2. Record exact checkpoint, training dataset, preprocessing, threshold and software commit.
-3. Prefer detectors evaluated cross-dataset, not only in-domain.
-4. Keep frame-level and video-level outputs separate.
-5. Export the scores to `case/external/deepfake_scores.json`; MFLab only marks a model output as validated when the examiner explicitly sets `validated: true` and documents the validation basis.
+## Stage 5 — deep learning
 
-Example schema:
+Um detector profundo ONNX pode ser configurado por `MFLAB_SYNTHETIC_ONNX`. Nenhum checkpoint é embutido como “verdade” no repositório. Pesos profundos precisam documentar arquitetura, hash, treinamento, domínio, geradores vistos/não vistos, pós-processamento e calibração.
 
-```json
-{
-  "files": {
-    "questioned.mp4": [
-      {
-        "name": "FTCN",
-        "score": 0.82,
-        "threshold": 0.50,
-        "decision": "fake",
-        "validated": true,
-        "dataset": "cross-dataset validation documented in case notes",
-        "checkpoint": "sha256:...",
-        "notes": "frame and video aggregation described in annex"
-      }
-    ]
-  }
-}
-```
+`MFLAB_SYNTHETIC_ONNX_VALIDATED=1` só deve ser usado depois de validação documental aplicável ao caso.
 
-## Stage 5 — Convergence review
+## Stage 6 — fusão/convergência
 
-The examiner should ask whether apparently independent findings may share one cause (for example, WhatsApp recompression can affect noise, JPEG and spectral features together). Independence cannot be assumed just because different scripts produced different numbers.
+O MFLab resume famílias aparentemente independentes: espectral, facial, face-contexto, ruído, residual de sensor, proveniência e detectores aprendidos validados.
 
-Native MFLab heuristics end with `evidentiary_conclusion: inconclusive`. Uncalibrated screening observations remain distinct from validated evidence families. A stronger conclusion belongs in the examiner's reasoning, supported by documented validation and case context, not in an automatic score.
+O resultado `convergence_level` serve para priorizar revisão. Ele **não** é probabilidade posterior e não assume independência estatística entre métodos.
 
-## Stage 6 — Report language
+## Stage 7 — decisão automática
 
-Preferred wording:
+A política permanece conservadora:
 
-- "No strong screening signals were observed under the methods executed; this does not prove authenticity."
-- "The file presents multiple findings that justify deeper examination."
-- "Validated model X produced score Y under checkpoint/configuration Z."
-- "The conclusion is based on convergence of A/B/C and is subject to the limitations listed."
+- heurísticas não calibradas → `screening_observations`;
+- modelos configurados mas não validados → observações, nunca evidência final;
+- modelos explicitamente validados → `evidence_families`, ainda dependentes de domínio/contexto;
+- conclusão automática → `evidentiary_conclusion: inconclusive`.
 
-Avoid:
+## Validação em dois níveis
 
-- "97% AI, therefore fake."
-- "ELA proves Photoshop."
-- "Weak PRNU proves synthetic image."
+### Nível 1 — regressão CI
 
+`mflab validate-demo` verifica a base controlada pequena e o contrato do ground truth. Serve para impedir regressões do software.
 
-## Controlled regression validation
+### Nível 2 — validação científica
 
-Run:
+`mflab benchmark-synthetic` usa datasets externos, splits declarados e métricas estatísticas. Serve para estimar desempenho, generalização e FPR.
 
-```bash
-mflab validate-demo --out validation/demo_validation.json
-```
+A validação científica deve incluir, quando possível, within-domain, cross-generator, cross-family, JPEG/resize/screenshot/reencode, análise por gerador, matriz de confusão, sensitivity, specificity, FPR, ROC-AUC, PR-AUC e protocolo livre de leakage.
 
-The bundled demo ground truth checks known injected transformations (for example copy-move translation and duplicated-frame positions) and verifies that the pristine fixture is not falsely escalated by the deepfake protocol. This is a **regression harness**, not a measurement of real-world sensitivity, specificity, false-positive rate or admissibility. Unsupported capabilities are reported explicitly rather than counted as successful detections.
-
-
-## v0.4 controlled synthetic fixtures
-
-The bundled regression set now contains a controlled face-replacement fixture and a fully AI-generated natural-scene fixture. The face fixture is created by blending an AI-generated donor face into the face region of the pristine source; it is **not** presented as a representative DeepFaceLab/FaceSwap benchmark sample. The full-AI fixture is used to exercise an uncalibrated signal-based synthetic-texture screen. Both source fixtures are retained under `dataset/fixtures/` for deterministic engineering regression.
-
-Reference-assisted image comparison and video sequence alignment are separate capabilities: they are strong when a trustworthy corresponding reference exists, but they do not solve reference-free authentication. The native face-boundary and optical-flow rules remain uncalibrated screening heuristics.
+Consulte `docs/SCIENTIFIC_VALIDATION.md`.
