@@ -26,38 +26,72 @@ def test_web_index_and_health(monkeypatch, tmp_path):
     assert health["version"] == current_version()
 
 
-def test_multi_image_upload_and_download_links(monkeypatch, tmp_path):
+def test_multi_image_upload_download_links_and_artifacts(monkeypatch, tmp_path):
     monkeypatch.setattr(webapp, "RUN_ROOT", tmp_path)
 
     def fake_analyze_case(case_dir, profile="full", run_veritas=False):
         case_dir = Path(case_dir)
         reports = []
         for p in sorted((case_dir / "original").iterdir()):
+            artifact_dir = case_dir / "visuals" / p.name
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            artifact = artifact_dir / "fft_spectrum.png"
+            Image.new("RGB", (24, 16), (10, 20, 30)).save(artifact)
             reports.append({
-                "file": str(p), "sha256": "a" * 64, "size_bytes": p.stat().st_size,
-                "analyzed_at": "2026-09-08T00:00:00+00:00", "profile": profile,
+                "file": str(p),
+                "sha256": "a" * 64,
+                "size_bytes": p.stat().st_size,
+                "analyzed_at": "2026-09-08T00:00:00+00:00",
+                "profile": profile,
                 "methods": {
                     "copy_move_orb": {"suspicious_cluster_count": 1, "suspicious_pairs": 12, "score": .6},
-                    "deepfake_protocol": {"triage_assessment": "screening_observations_only", "evidentiary_conclusion": "inconclusive", "screening_observations": []},
+                    "deepfake_protocol": {
+                        "triage_assessment": "screening_observations_only",
+                        "evidentiary_conclusion": "inconclusive",
+                        "screening_observations": [],
+                    },
+                },
+                "visual_artifacts": {
+                    "status": "success",
+                    "artifact_count": 1,
+                    "items": [{
+                        "id": "fft_spectrum",
+                        "label": "Espectro FFT",
+                        "method": "frequency",
+                        "category": "frequencia",
+                        "path": f"visuals/{p.name}/fft_spectrum.png",
+                        "caption": "Teste visual.",
+                    }],
                 },
             })
         (case_dir / "report.json").write_text(json.dumps({"reports": reports}), encoding="utf-8")
         return reports
 
     def fake_report(case_dir, fmt="docx"):
-        final = Path(case_dir) / "final"; final.mkdir(exist_ok=True)
+        final = Path(case_dir) / "final"
+        final.mkdir(exist_ok=True)
         p = final / (Path(case_dir).name + ("_laudo_preliminar.docx" if fmt == "docx" else "_laudo_preliminar.md"))
         p.write_bytes(b"test" if fmt == "docx" else b"# test")
         return str(p)
 
     monkeypatch.setattr(webapp, "analyze_case", fake_analyze_case)
     monkeypatch.setattr(webapp, "generate_preliminary_report", fake_report)
-    app = webapp.create_app(); client = app.test_client()
-    data = {"profile": "full", "files": [(io.BytesIO(_png_bytes()), "a.png"), (io.BytesIO(_png_bytes()), "b.png")]}
+    app = webapp.create_app()
+    client = app.test_client()
+    data = {
+        "profile": "full",
+        "files": [(io.BytesIO(_png_bytes()), "a.png"), (io.BytesIO(_png_bytes()), "b.png")],
+    }
     response = client.post("/api/analyze", data=data, content_type="multipart/form-data")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["summary"]["files"] == 2
     assert payload["summary"]["screening_signals"] == 2
+    assert payload["summary"]["visual_artifacts"] == 2
     assert payload["downloads"]["docx"].endswith("/download/docx")
     assert len(payload["files"]) == 2
+    assert payload["files"][0]["artifact_count"] == 1
+    artifact_url = payload["files"][0]["artifacts"][0]["url"]
+    served = client.get(artifact_url)
+    assert served.status_code == 200
+    assert served.mimetype == "image/png"
