@@ -59,7 +59,7 @@ def _signal_counts(methods: dict) -> dict[str, int]:
     dct = methods.get("jpeg_dct") or {}
     compression += int(_numeric(dct.get("score"), 0) >= 0.10)
     ghost = methods.get("jpeg_ghost") or {}
-    compression += int(bool(ghost.get("suspicious_qualities") or ghost.get("candidates") or ghost.get("quality_sweep")))
+    compression += int(bool(ghost.get("suspicious_qualities") or ghost.get("candidates")))
     rs = methods.get("resampling") or {}
     resampling += int(rs.get("screening_flag") is True)
     nm = methods.get("noise_map") or {}
