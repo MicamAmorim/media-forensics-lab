@@ -10,3 +10,5 @@ scientific_status: pilot_internal_aigenbench
 validated: false
 evidentiary_use: screening_only
 requested_by: project owner
+retry_reason: add torchvision dependency for AutoImageProcessor
+retry_sequence: 2
