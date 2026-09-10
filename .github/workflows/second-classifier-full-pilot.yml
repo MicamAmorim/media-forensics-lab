@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: second-classifier-full-52k-pilot-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   NUM_SHARDS: '26'
@@ -99,7 +99,15 @@ jobs:
         run: >-
           python -m pip install --upgrade pip
           'numpy>=1.24' 'Pillow>=10' 'opencv-python-headless>=4.8,<5'
-          'torch>=2.2' 'transformers>=4.45'
+          'torch>=2.2' 'torchvision>=0.17' 'transformers>=4.45'
+      - name: Verify vision stack
+        run: |
+          python - <<'PY'
+          import torch, torchvision
+          from transformers import AutoImageProcessor
+          print({'torch': torch.__version__, 'torchvision': torchvision.__version__})
+          assert AutoImageProcessor is not None
+          PY
       - name: Restore DINOv2 model cache
         uses: actions/cache@v4
         with:
