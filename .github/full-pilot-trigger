@@ -1,0 +1,12 @@
+MFLab Classifier 2 full 52k pilot
+
+experiment: mflab-aigenbench-derived-v1
+backbone: facebook/dinov2-small
+embedding_dim: 384
+samples: 52000
+shards: 26
+learning_curve: 125,250,500
+scientific_status: pilot_internal_aigenbench
+validated: false
+evidentiary_use: screening_only
+requested_by: project owner
