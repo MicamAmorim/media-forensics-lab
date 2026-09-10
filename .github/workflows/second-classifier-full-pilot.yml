@@ -2,9 +2,17 @@ name: Second Classifier Full 52k Pilot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feat/second-synthetic-classifier]
+    paths:
+      - '.github/full-pilot-trigger'
 
 permissions:
   contents: read
+
+concurrency:
+  group: second-classifier-full-52k-pilot-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   NUM_SHARDS: '26'
@@ -77,7 +85,7 @@ jobs:
     needs: build-plan
     strategy:
       fail-fast: false
-      max-parallel: 13
+      max-parallel: 4
       matrix:
         shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
     runs-on: ubuntu-latest
@@ -92,6 +100,11 @@ jobs:
           python -m pip install --upgrade pip
           'numpy>=1.24' 'Pillow>=10' 'opencv-python-headless>=4.8,<5'
           'torch>=2.2' 'transformers>=4.45'
+      - name: Restore DINOv2 model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub/models--facebook--dinov2-small
+          key: hf-dinov2-small-${{ runner.os }}-${{ runner.arch }}-v1
       - name: Download experimental plan
         uses: actions/download-artifact@v4
         with:
@@ -114,7 +127,7 @@ jobs:
       - name: Validate shard artifact
         run: |
           python - <<'PY'
-          import json, os
+          import json
           from pathlib import Path
           import numpy as np
           shard=int('${{ matrix.shard }}')
