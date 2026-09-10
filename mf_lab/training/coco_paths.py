@@ -27,12 +27,21 @@ def canonical_coco_filename(file_id: str) -> str:
 
 
 def coco_http_url(file_id: str) -> str:
+    """Return the canonical public COCO image URL.
+
+    COCO's published 2017 download instructions use the HTTP endpoint at
+    images.cocodataset.org. The same host currently presents a hostname-mismatch
+    TLS certificate on GitHub-hosted runners, so forcing HTTPS makes otherwise
+    valid official URLs fail before any HTTP response is received. The acquired
+    bytes are SHA-256 frozen immediately by MFLab; HTTPS mirrors may be added as
+    an independent transport later without changing the selected COCO ids.
+    """
     prefix = str(file_id).split("/", 1)[0]
     try:
         split = _COCO_PREFIX_TO_SPLIT[prefix]
     except KeyError as exc:
         raise ValueError(f"unsupported COCO file id: {file_id}") from exc
-    return f"https://images.cocodataset.org/{split}/{canonical_coco_filename(file_id)}"
+    return f"http://images.cocodataset.org/{split}/{canonical_coco_filename(file_id)}"
 
 
 def coco_zip_member(file_id: str) -> str:
