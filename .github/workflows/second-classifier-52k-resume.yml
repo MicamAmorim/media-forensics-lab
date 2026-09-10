@@ -1,0 +1,198 @@
+name: Second Classifier 52k Resume
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: second-classifier-52k-resume
+  cancel-in-progress: true
+
+jobs:
+  recover-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download canonical plan from run 34427323763
+        uses: actions/download-artifact@v4
+        with:
+          name: second-classifier-52k-plan
+          path: recovered/plan
+          github-token: ${{ github.token }}
+          run-id: 34427323763
+      - name: Validate recovered plan artifact exists
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          files = list(Path('recovered/plan').rglob('*'))
+          assert any(p.is_file() for p in files), 'Recovered plan artifact is empty'
+          print('\n'.join(str(p) for p in files if p.is_file()))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-52k-plan-resumed
+          path: recovered/plan
+          retention-days: 14
+
+  embed-remaining:
+    needs: recover-plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install shard dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[second]' torchvision
+      - name: Verify vision stack
+        run: |
+          python - <<'PY'
+          import torch, torchvision
+          from transformers import AutoImageProcessor
+          print('torch', torch.__version__)
+          print('torchvision', torchvision.__version__)
+          print('AutoImageProcessor', AutoImageProcessor.__name__)
+          PY
+      - name: Restore DINOv2 model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: dinov2-small-${{ runner.os }}-v1
+      - name: Download recovered plan
+        uses: actions/download-artifact@v4
+        with:
+          name: second-classifier-52k-plan-resumed
+          path: recovered/plan
+      - name: Locate plan CSV
+        id: locate
+        shell: bash
+        run: |
+          PLAN=$(find recovered/plan -type f -name '*.csv' | head -n 1)
+          test -n "$PLAN"
+          echo "plan=$PLAN" >> "$GITHUB_OUTPUT"
+          echo "Using $PLAN"
+      - name: Embed shard ${{ matrix.shard }}
+        env:
+          HF_HOME: ~/.cache/huggingface
+        run: |
+          python scripts/second_classifier_shard.py \
+            --plan "${{ steps.locate.outputs.plan }}" \
+            --shard ${{ matrix.shard }} \
+            --num-shards 26 \
+            --work-dir "work/shard-${{ matrix.shard }}" \
+            --output "out/shard-${{ matrix.shard }}.npz" \
+            --provenance "out/shard-${{ matrix.shard }}-provenance.csv"
+      - name: Validate shard artifact
+        run: |
+          python - <<'PY'
+          import numpy as np
+          from pathlib import Path
+          shard = '${{ matrix.shard }}'
+          p = Path(f'out/shard-{shard}.npz')
+          assert p.exists(), p
+          d = np.load(p, allow_pickle=True)
+          assert 'X' in d.files, d.files
+          X = d['X']
+          assert X.ndim == 2 and X.shape[1] == 384, X.shape
+          assert np.isfinite(X).all()
+          print('validated', p, X.shape)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-shard-${{ matrix.shard }}
+          path: |
+            out/shard-${{ matrix.shard }}.npz
+            out/shard-${{ matrix.shard }}-provenance.csv
+          retention-days: 14
+
+  merge-and-train:
+    needs: embed-remaining
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install training dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[second]'
+      - name: Recover completed shards 0-3 from run 34427323763
+        uses: actions/download-artifact@v4
+        with:
+          pattern: second-classifier-shard-*
+          path: shards/old
+          merge-multiple: false
+          github-token: ${{ github.token }}
+          run-id: 34427323763
+      - name: Download resumed shards 4-25
+        uses: actions/download-artifact@v4
+        with:
+          pattern: second-classifier-shard-*
+          path: shards/new
+          merge-multiple: false
+      - name: Keep only recovered shards 0-3 and resumed 4-25
+        run: |
+          mkdir -p shards/all
+          for s in 0 1 2 3; do
+            d=$(find shards/old -type f -name "shard-${s}.npz" | head -n 1)
+            test -n "$d"
+            cp "$d" "shards/all/shard-${s}.npz"
+          done
+          for s in $(seq 4 25); do
+            d=$(find shards/new -type f -name "shard-${s}.npz" | head -n 1)
+            test -n "$d"
+            cp "$d" "shards/all/shard-${s}.npz"
+          done
+          test "$(find shards/all -type f -name 'shard-*.npz' | wc -l)" -eq 26
+          ls -lh shards/all
+      - name: Merge 26 shards
+        run: |
+          python scripts/second_classifier_merge_shards.py \
+            --input-dir shards/all \
+            --output out/second-classifier-52k-embeddings.npz \
+            --expected-total 52000 \
+            --expected-shards 26
+      - name: Train calibrated head and evaluate IID/OOD
+        run: |
+          mkdir -p out/model
+          python scripts/second_synthetic_classifier.py train-head \
+            --embeddings out/second-classifier-52k-embeddings.npz \
+            --output-dir out/model
+      - name: Validate final outputs
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+          emb = Path('out/second-classifier-52k-embeddings.npz')
+          assert emb.exists()
+          d = np.load(emb, allow_pickle=True)
+          assert d['X'].shape == (52000, 384), d['X'].shape
+          results = list(Path('out/model').glob('*.json'))
+          assert results, 'No result JSON emitted'
+          print('embeddings', d['X'].shape)
+          for p in results:
+              print(p, p.read_text()[:2000])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-52k-final
+          path: |
+            out/second-classifier-52k-embeddings.npz
+            out/model
+          retention-days: 14
