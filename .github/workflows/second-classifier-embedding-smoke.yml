@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: second-classifier-embedding-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dinov2-embedding-smoke:
     runs-on: ubuntu-latest
