@@ -12,7 +12,7 @@ from mf_lab.training.selective_acquisition import (
 from mf_lab.training.selective_embeddings import (
     extract_verified_materialized_embeddings,
 )
-from mf_lab.training.selective_remote_rows import build_selective_plan_rows
+from mf_lab.training.selective_remote_rows_v2 import build_selective_plan_rows
 from mf_lab.training.stable_real_acquisition import (
     freeze_materialized_corpus,
     materialize_stable_plan,
