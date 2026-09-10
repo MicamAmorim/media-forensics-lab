@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: second-classifier-pilot-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-pilot-plan:
     runs-on: ubuntu-latest
@@ -77,9 +81,13 @@ jobs:
           assert set(summary['ood_generators']) == {
               'Stable Diffusion XL 1.0', 'DALL-E 3', 'FLUX 1 Dev', 'FLUX 1 Schnell'
           }
+          coco = [r for r in rows if r['file_id'].startswith(('COCO2017_train/','COCO2017_val/'))]
+          assert coco
+          assert all(r['source_url'].startswith('http://images.cocodataset.org/') for r in coco)
           print(json.dumps({
               'rows': len(rows),
               'role_class_counts': {f'{k[0]}:{k[1]}': v for k,v in counts.items()},
+              'coco_rows': len(coco),
               'train_scan': summary['scan']['train'],
               'validation_scan': summary['scan']['validation'],
           }, indent=2))
