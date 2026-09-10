@@ -13,7 +13,7 @@ from mf_lab.training.selective_embeddings import (
     extract_verified_materialized_embeddings,
 )
 from mf_lab.training.selective_remote_rows_v2 import build_selective_plan_rows
-from mf_lab.training.stable_real_acquisition import (
+from mf_lab.training.stable_real_acquisition_v2 import (
     freeze_materialized_corpus,
     materialize_stable_plan,
 )
@@ -49,7 +49,7 @@ def parser() -> argparse.ArgumentParser:
 
     stable = sub.add_parser(
         "materialize-stable",
-        help="stable acquisition: synthetic direct, COCO official ZIP, LAION audited replacements",
+        help="stable acquisition: synthetic direct, canonical COCO official ZIP, LAION audited replacements",
     )
     stable.add_argument("--plan", required=True)
     stable.add_argument("--output-dir", required=True)
