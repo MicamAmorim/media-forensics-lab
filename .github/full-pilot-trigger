@@ -10,5 +10,8 @@ scientific_status: pilot_internal_aigenbench
 validated: false
 evidentiary_use: screening_only
 requested_by: project owner
-retry_reason: add torchvision dependency for AutoImageProcessor
-retry_sequence: 2
+retry_reason: resume from completed artifacts after interrupted run
+source_run_id: 34427323763
+reused_shards: 0,1,2,3
+remaining_shards: 4-25
+retry_sequence: 3
