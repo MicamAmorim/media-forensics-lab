@@ -11,10 +11,6 @@ permissions:
   contents: read
   actions: read
 
-concurrency:
-  group: second-classifier-full-52k-pilot-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   NUM_SHARDS: '26'
   SOURCE_RUN_ID: '34427323763'
