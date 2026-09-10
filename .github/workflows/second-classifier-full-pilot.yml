@@ -1,0 +1,241 @@
+name: Second Classifier Full 52k Pilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/second-synthetic-classifier]
+    paths:
+      - '.github/full-pilot-trigger'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: second-classifier-full-52k-pilot-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NUM_SHARDS: '26'
+  SOURCE_RUN_ID: '34427323763'
+
+jobs:
+  build-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover canonical 52k plan from interrupted run
+        uses: actions/download-artifact@v4
+        with:
+          name: second-classifier-52k-plan
+          path: work/second_classifier/full-pilot
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+      - name: Validate recovered plan
+        run: |
+          python - <<'PY'
+          import csv, json
+          from collections import Counter
+          from pathlib import Path
+          p=Path('work/second_classifier/full-pilot/acquisition-plan.csv')
+          rows=list(csv.DictReader(p.open(encoding='utf-8')))
+          assert len(rows)==52000
+          assert len({r['sample_id'] for r in rows})==52000
+          counts=Counter((r['role'],r['label']) for r in rows)
+          assert counts==Counter({
+            ('fit','0'):16000,('fit','1'):16000,
+            ('calibration','0'):4000,('calibration','1'):4000,
+            ('iid_test','0'):4000,('iid_test','1'):4000,
+            ('ood_test','0'):2000,('ood_test','1'):2000,
+          })
+          coco=[r for r in rows if r['file_id'].startswith(('COCO2017_train/','COCO2017_val/'))]
+          assert coco
+          assert all(r['source_url'].startswith('http://images.cocodataset.org/') for r in coco)
+          print(json.dumps({'rows':len(rows),'unique_sample_ids':len({r['sample_id'] for r in rows}),'coco':len(coco)}, indent=2))
+          PY
+      - name: Re-upload frozen experimental plan for resumed run
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-52k-plan
+          path: |
+            work/second_classifier/full-pilot/acquisition-plan.csv
+            work/second_classifier/full-pilot/acquisition-plan.csv.summary.json
+          retention-days: 14
+
+  embed-shards:
+    needs: build-plan
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install shard dependencies
+        run: >-
+          python -m pip install --upgrade pip
+          'numpy>=1.24' 'Pillow>=10' 'opencv-python-headless>=4.8,<5'
+          'torch>=2.2' 'torchvision>=0.17' 'transformers>=4.45'
+      - name: Verify vision stack
+        run: |
+          python - <<'PY'
+          import torch, torchvision
+          from transformers import AutoImageProcessor
+          print({'torch': torch.__version__, 'torchvision': torchvision.__version__})
+          assert AutoImageProcessor is not None
+          PY
+      - name: Restore DINOv2 model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub/models--facebook--dinov2-small
+          key: hf-dinov2-small-${{ runner.os }}-${{ runner.arch }}-v1
+      - name: Download recovered experimental plan
+        uses: actions/download-artifact@v4
+        with:
+          name: second-classifier-52k-plan
+          path: work/second_classifier/full-pilot
+      - name: Embed shard ${{ matrix.shard }}
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/second_classifier_sharded.py embed-shard \
+            --plan work/second_classifier/full-pilot/acquisition-plan.csv \
+            --work-dir work/second_classifier/shard-${{ matrix.shard }} \
+            --cache-dir work/second_classifier/shard-${{ matrix.shard }}/cache \
+            --shard-index ${{ matrix.shard }} \
+            --num-shards $NUM_SHARDS \
+            --workers 8 \
+            --backbone facebook/dinov2-small \
+            --device cpu \
+            --batch-size 32
+      - name: Validate shard artifact
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+          shard=int('${{ matrix.shard }}')
+          root=Path(f'work/second_classifier/shard-{shard}')
+          report=json.loads((root/'shard-report.json').read_text())
+          data=np.load(root/f'embeddings-shard-{shard:02d}.npz', allow_pickle=False)
+          assert report['success'] is True
+          assert report['raw_deleted_after_embedding'] is True
+          assert data['X'].shape[0] == report['acquisition']['rows']
+          assert data['X'].shape[1] == 384
+          assert np.isfinite(data['X']).all()
+          print(json.dumps({'shard':shard,'rows':int(data['X'].shape[0]),'replacements':report['acquisition']['replacements']}, indent=2))
+          PY
+      - name: Upload shard embedding + provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-shard-${{ matrix.shard }}
+          path: |
+            work/second_classifier/shard-${{ matrix.shard }}/embeddings-shard-*.npz
+            work/second_classifier/shard-${{ matrix.shard }}/embeddings-shard-*.npz.metadata.json
+            work/second_classifier/shard-${{ matrix.shard }}/materialized.csv
+            work/second_classifier/shard-${{ matrix.shard }}/diagnostics.json
+            work/second_classifier/shard-${{ matrix.shard }}/replacements.json
+            work/second_classifier/shard-${{ matrix.shard }}/shard-report.json
+          retention-days: 14
+
+  merge-and-train:
+    needs: embed-shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install merge/training dependencies
+        run: >-
+          python -m pip install --upgrade pip
+          'numpy>=1.24' 'Pillow>=10' 'opencv-python-headless>=4.8,<5'
+          'scikit-learn>=1.7.2,<1.8' 'joblib>=1.3'
+      - name: Download recovered experimental plan
+        uses: actions/download-artifact@v4
+        with:
+          name: second-classifier-52k-plan
+          path: work/second_classifier/full-pilot
+      - name: Recover completed shards 0-3 from interrupted run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: second-classifier-shard-*
+          path: work/second_classifier/old-shards
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+      - name: Download resumed shards 4-25
+        uses: actions/download-artifact@v4
+        with:
+          pattern: second-classifier-shard-*
+          path: work/second_classifier/new-shards
+      - name: Verify exact recovered/resumed shard partition
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          def ids(root):
+              out=[]
+              for p in Path(root).rglob('embeddings-shard-*.npz'):
+                  m=re.search(r'embeddings-shard-(\d+)\.npz$',p.name)
+                  if m: out.append(int(m.group(1)))
+              return sorted(out)
+          old=ids('work/second_classifier/old-shards')
+          new=ids('work/second_classifier/new-shards')
+          assert old==[0,1,2,3], old
+          assert new==list(range(4,26)), new
+          print({'recovered':old,'resumed':new})
+          PY
+      - name: Merge exactly 52k embeddings
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/second_classifier_sharded.py merge \
+            --plan work/second_classifier/full-pilot/acquisition-plan.csv \
+            --shard-glob 'work/second_classifier/*-shards/**/embeddings-shard-*.npz' \
+            --out work/second_classifier/full-pilot/dinov2-52k.npz
+      - name: Train calibrated head and learning curve
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/second_synthetic_classifier.py train-head \
+            --embeddings work/second_classifier/full-pilot/dinov2-52k.npz \
+            --model-out work/second_classifier/full-pilot/mflab_aigenbench_dinov2s14_logreg_calibrated_v1.joblib \
+            --result-out work/second_classifier/full-pilot/result.json \
+            --learning-curve 125,250,500
+      - name: Validate pilot policy
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+          emb=np.load('work/second_classifier/full-pilot/dinov2-52k.npz',allow_pickle=False)
+          assert emb['X'].shape==(52000,384),emb['X'].shape
+          result=json.loads(Path('work/second_classifier/full-pilot/result.json').read_text())
+          assert result['model']['validated'] is False
+          assert result['model']['scientific_status']=='pilot_internal_aigenbench'
+          assert result['policy']['evidentiary_use']=='screening_only'
+          assert result['splits']['fit']==32000
+          assert result['splits']['calibration']==8000
+          assert result['splits']['iid_test']==8000
+          assert result['splits']['ood_test']==4000
+          print(json.dumps({'iid':result['final_iid_test'],'ood':result['final_ood_test']}, indent=2))
+          PY
+      - name: Upload full pilot outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-full-52k-pilot
+          path: |
+            work/second_classifier/full-pilot/dinov2-52k.npz
+            work/second_classifier/full-pilot/dinov2-52k.npz.metadata.json
+            work/second_classifier/full-pilot/mflab_aigenbench_dinov2s14_logreg_calibrated_v1.joblib
+            work/second_classifier/full-pilot/result.json
+            work/second_classifier/full-pilot/acquisition-plan.csv
+            work/second_classifier/full-pilot/acquisition-plan.csv.summary.json
+          retention-days: 14

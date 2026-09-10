@@ -1,0 +1,112 @@
+name: Second Classifier Pilot Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/second-classifier-pilot-plan.yml'
+      - 'mf_lab/training/selective_acquisition.py'
+      - 'mf_lab/training/selective_remote_rows.py'
+      - 'mf_lab/training/second_classifier.py'
+      - 'scripts/second_classifier_acquire.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: second-classifier-pilot-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-pilot-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal planner dependencies
+        run: >-
+          python -m pip install --upgrade pip
+          'numpy>=1.24'
+          'Pillow>=10'
+          'opencv-python-headless>=4.8,<5'
+
+      - name: Restore resumable Dataset Viewer page cache
+        id: restore-row-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: work/second_classifier/pilot-plan/cache
+          key: second-classifier-row-pages-${{ runner.os }}-${{ github.head_ref || github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            second-classifier-row-pages-${{ runner.os }}-${{ github.head_ref || github.ref_name }}-${{ github.run_id }}-
+            second-classifier-row-pages-${{ runner.os }}-${{ github.head_ref || github.ref_name }}-
+
+      - name: Build deterministic 52k pilot plan
+        env:
+          PYTHONPATH: .
+        run: |
+          mkdir -p work/second_classifier/pilot-plan/cache
+          python scripts/second_classifier_acquire.py build-plan \
+            --cache-dir work/second_classifier/pilot-plan/cache \
+            --out work/second_classifier/pilot-plan/acquisition-plan.csv
+
+      - name: Validate pilot plan
+        run: |
+          python - <<'PY'
+          import csv, json
+          from collections import Counter
+          from pathlib import Path
+          csv_path = Path('work/second_classifier/pilot-plan/acquisition-plan.csv')
+          summary_path = Path(str(csv_path) + '.summary.json')
+          rows = list(csv.DictReader(csv_path.open(encoding='utf-8')))
+          summary = json.loads(summary_path.read_text(encoding='utf-8'))
+          assert len(rows) == 52000, len(rows)
+          counts = Counter((r['role'], r['label']) for r in rows)
+          expected = {
+              ('fit','1'):16000, ('fit','0'):16000,
+              ('calibration','1'):4000, ('calibration','0'):4000,
+              ('iid_test','1'):4000, ('iid_test','0'):4000,
+              ('ood_test','1'):2000, ('ood_test','0'):2000,
+          }
+          assert dict(counts) == expected, counts
+          assert summary['unresolved_source_urls'] == 0
+          assert summary['full_fake_dataset_download_required'] is False
+          assert set(summary['ood_generators']) == {
+              'Stable Diffusion XL 1.0', 'DALL-E 3', 'FLUX 1 Dev', 'FLUX 1 Schnell'
+          }
+          coco = [r for r in rows if r['file_id'].startswith(('COCO2017_train/','COCO2017_val/'))]
+          assert coco
+          assert all(r['source_url'].startswith('http://images.cocodataset.org/') for r in coco)
+          print(json.dumps({
+              'rows': len(rows),
+              'role_class_counts': {f'{k[0]}:{k[1]}': v for k,v in counts.items()},
+              'coco_rows': len(coco),
+              'train_scan': summary['scan']['train'],
+              'validation_scan': summary['scan']['validation'],
+          }, indent=2))
+          PY
+
+      - name: Save resumable Dataset Viewer page cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: work/second_classifier/pilot-plan/cache
+          key: second-classifier-row-pages-${{ runner.os }}-${{ github.head_ref || github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload plan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-52k-pilot-plan
+          path: |
+            work/second_classifier/pilot-plan/acquisition-plan.csv
+            work/second_classifier/pilot-plan/acquisition-plan.csv.summary.json
+          if-no-files-found: warn
+          retention-days: 14

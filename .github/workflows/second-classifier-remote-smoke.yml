@@ -1,0 +1,83 @@
+name: Second Classifier Remote Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/second-classifier-remote-smoke.yml'
+      - 'mf_lab/training/selective_acquisition.py'
+      - 'mf_lab/training/selective_embeddings.py'
+      - 'mf_lab/training/selective_remote_rows.py'
+      - 'mf_lab/training/stable_real_acquisition.py'
+      - 'scripts/second_classifier_remote_smoke.py'
+      - 'tests/test_second_classifier_stable_real_acquisition.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: second-classifier-remote-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  remote-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal smoke dependencies
+        run: >-
+          python -m pip install --upgrade pip
+          'numpy>=1.24'
+          'Pillow>=10'
+          'opencv-python-headless>=4.8,<5'
+
+      - name: Run 100-image remote acquisition smoke
+        env:
+          PYTHONPATH: .
+        run: python scripts/second_classifier_remote_smoke.py
+
+      - name: Validate smoke report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('work/second_classifier/remote-smoke/remote-smoke-report.json')
+          data = json.loads(p.read_text())
+          assert data['success'] is True
+          assert data['rows'] == 100
+          assert data['acquisition']['failed_or_unresolved'] == 0
+          assert data['acquisition']['replacements'] >= 1
+          assert data['verification']['complete'] is True
+          assert data['verification']['all_sha256_verified'] is True
+          assert data['corpus_lock']['all_sample_sha256_verified'] is True
+          assert data['corpus_lock']['rows'] == 100
+          assert data['corpus_lock']['corpus_id'].startswith('mflab-aigenbench-derived-v1-')
+          assert data['sha_postcheck_failures'] == 0
+          print(json.dumps(data, indent=2))
+          PY
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-remote-smoke
+          path: |
+            work/second_classifier/remote-smoke/remote-smoke-report.json
+            work/second_classifier/remote-smoke/materialized.csv
+            work/second_classifier/remote-smoke/materialized.csv.summary.json
+            work/second_classifier/remote-smoke/plan.csv
+            work/second_classifier/remote-smoke/diagnostics.json
+            work/second_classifier/remote-smoke/replacements.json
+            work/second_classifier/remote-smoke/frozen-manifest.csv
+            work/second_classifier/remote-smoke/corpus.lock.json
+          if-no-files-found: warn
+          retention-days: 14

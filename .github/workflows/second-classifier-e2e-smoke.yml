@@ -1,0 +1,106 @@
+name: Second Classifier End-to-End Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/second-classifier-e2e-smoke.yml'
+      - 'mf_lab/training/second_classifier.py'
+      - 'mf_lab/training/selective_acquisition.py'
+      - 'mf_lab/training/selective_embeddings.py'
+      - 'mf_lab/training/selective_remote_rows.py'
+      - 'mf_lab/training/stable_real_acquisition_v2.py'
+      - 'scripts/second_classifier_e2e_smoke.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: second-classifier-e2e-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install scientific smoke dependencies
+        run: >-
+          python -m pip install --upgrade pip
+          'numpy>=1.24'
+          'Pillow>=10'
+          'opencv-python-headless>=4.8,<5'
+          'torch>=2.2'
+          'torchvision>=0.17'
+          'transformers>=4.45'
+          'scikit-learn>=1.7.2,<1.8'
+          'joblib>=1.3'
+
+      - name: Verify vision stack
+        run: |
+          python - <<'PY'
+          import torch, torchvision
+          from transformers import AutoImageProcessor
+          print({'torch': torch.__version__, 'torchvision': torchvision.__version__})
+          assert AutoImageProcessor is not None
+          PY
+
+      - name: Run acquisition to calibrated-head smoke
+        env:
+          PYTHONPATH: .
+        run: python scripts/second_classifier_e2e_smoke.py
+
+      - name: Validate scientific outputs
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+
+          root = Path('work/second_classifier/e2e-smoke')
+          report = json.loads((root/'e2e-report.json').read_text())
+          result = json.loads((root/'training-result.json').read_text())
+          data = np.load(root/'dinov2_embeddings.npz', allow_pickle=False)
+          assert report['success'] is True
+          assert report['rows'] == 160
+          assert report['acquisition']['failed_or_unresolved'] == 0
+          assert data['X'].shape == (160, 384)
+          assert result['model']['validated'] is False
+          assert result['policy']['evidentiary_use'] == 'screening_only'
+          assert result['splits']['fit'] == 80
+          assert result['splits']['calibration'] == 20
+          assert result['splits']['iid_test'] == 20
+          assert result['splits']['ood_test'] == 40
+          assert len(result['learning_curve']) >= 2
+          print(json.dumps({
+              'iid': result['final_iid_test'],
+              'ood': result['final_ood_test'],
+              'replacements': report['acquisition']['replacements'],
+          }, indent=2))
+          PY
+
+      - name: Upload end-to-end evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-e2e-smoke
+          path: |
+            work/second_classifier/e2e-smoke/e2e-report.json
+            work/second_classifier/e2e-smoke/training-result.json
+            work/second_classifier/e2e-smoke/second_classifier_smoke.joblib
+            work/second_classifier/e2e-smoke/dinov2_embeddings.npz
+            work/second_classifier/e2e-smoke/corpus.lock.json
+            work/second_classifier/e2e-smoke/frozen-manifest.csv
+            work/second_classifier/e2e-smoke/replacements.json
+            work/second_classifier/e2e-smoke/diagnostics.json
+          if-no-files-found: warn
+          retention-days: 14

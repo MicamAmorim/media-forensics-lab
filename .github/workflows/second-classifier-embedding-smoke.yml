@@ -1,0 +1,118 @@
+name: Second Classifier DINOv2 Embedding Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/second-classifier-embedding-smoke.yml'
+      - 'mf_lab/training/selective_acquisition.py'
+      - 'mf_lab/training/selective_embeddings.py'
+      - 'mf_lab/training/selective_remote_rows.py'
+      - 'mf_lab/training/stable_real_acquisition.py'
+      - 'scripts/second_classifier_remote_smoke.py'
+      - 'scripts/second_classifier_acquire.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: second-classifier-embedding-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dinov2-embedding-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install embedding smoke dependencies
+        run: >-
+          python -m pip install --upgrade pip
+          'numpy>=1.24'
+          'Pillow>=10'
+          'opencv-python-headless>=4.8,<5'
+          'torch>=2.2'
+          'torchvision>=0.17'
+          'transformers>=4.45'
+
+      - name: Verify vision stack
+        run: |
+          python - <<'PY'
+          import torch, torchvision
+          from transformers import AutoImageProcessor
+          print({'torch': torch.__version__, 'torchvision': torchvision.__version__})
+          assert AutoImageProcessor is not None
+          PY
+
+      - name: Materialize verified 100-image smoke corpus
+        env:
+          PYTHONPATH: .
+        run: python scripts/second_classifier_remote_smoke.py
+
+      - name: Extract frozen DINOv2 embeddings
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/second_classifier_acquire.py extract-embeddings \
+            --manifest work/second_classifier/remote-smoke/materialized.csv \
+            --out work/second_classifier/embedding-smoke/dinov2_embeddings.npz \
+            --backbone facebook/dinov2-small \
+            --device cpu \
+            --batch-size 16
+
+      - name: Validate embedding tensor and metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+
+          npz_path = Path('work/second_classifier/embedding-smoke/dinov2_embeddings.npz')
+          data = np.load(npz_path, allow_pickle=False)
+          assert data['X'].shape == (100, 384), data['X'].shape
+          assert data['X'].dtype == np.float32
+          assert data['y'].shape == (100,)
+          assert int((data['y'] == 0).sum()) == 50
+          assert int((data['y'] == 1).sum()) == 50
+          assert np.isfinite(data['X']).all()
+          norms = np.linalg.norm(data['X'], axis=1)
+          assert (norms > 0).all()
+          report = {
+              'protocol': 'MFLAB-SCI-DINOV2-EMBEDDING-SMOKE-0.1',
+              'rows': 100,
+              'embedding_shape': list(data['X'].shape),
+              'dtype': str(data['X'].dtype),
+              'real': int((data['y'] == 0).sum()),
+              'synthetic': int((data['y'] == 1).sum()),
+              'finite': bool(np.isfinite(data['X']).all()),
+              'min_l2_norm': float(norms.min()),
+              'max_l2_norm': float(norms.max()),
+              'success': True,
+          }
+          out = Path('work/second_classifier/embedding-smoke/report.json')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(json.dumps(report, indent=2), encoding='utf-8')
+          print(json.dumps(report, indent=2))
+          PY
+
+      - name: Upload embedding smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-classifier-dinov2-embedding-smoke
+          path: |
+            work/second_classifier/embedding-smoke/dinov2_embeddings.npz
+            work/second_classifier/embedding-smoke/dinov2_embeddings.npz.metadata.json
+            work/second_classifier/embedding-smoke/report.json
+            work/second_classifier/remote-smoke/corpus.lock.json
+            work/second_classifier/remote-smoke/frozen-manifest.csv
+          if-no-files-found: warn
+          retention-days: 14
